@@ -1,9 +1,9 @@
 // Update this fingerprint with npm run cache:version after changing app assets.
-const CACHE_VERSION = 'f7ac727734ad3d330aa3';
+const CACHE_VERSION = '58377b3a2503ab1070da';
 const SHELL_FILES = [
   "index.html", "styles.css", "security.js", "core.js", "app.js", "pwa.js",
   "servers.json", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png",
-  "rocket.png", "higheriyer.png"
+  "rocket.png", "higheriyer.png", "favicon-48.png", "apple-touch-icon.png"
 ];
 const ROOT = new URL('./', self.location.href);
 const CACHE_PREFIX = `orbit-shell:${ROOT.pathname}:`;

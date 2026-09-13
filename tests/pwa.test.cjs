@@ -27,7 +27,11 @@ test('manifest launches inside its own scope at localhost and GitHub project pat
     assert.equal(bytes.subarray(1,4).toString(),'PNG');
     assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size);
   }
+  for(const [name,size] of [['favicon-48.png',48],['apple-touch-icon.png',180]]){const bytes=fs.readFileSync('dist/'+name);assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size);}
+  assert.equal(manifest.shortcuts[0].icons.length,2);
   const html=fs.readFileSync('dist/index.html','utf8');
+  assert.match(html,/href="favicon-48.png" type="image\/png" sizes="48x48"/);
+  assert.match(html,/rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180"/);
   assert.match(html,/manifest-src 'self'/);assert.match(html,/worker-src 'self'/);
   assert.match(html,/trusted-types orbit-worker; require-trusted-types-for 'script'/);
 });

@@ -32,5 +32,5 @@ test('local server enforces security headers and exposes only public assets',asy
   const manifest=await call('/manifest.webmanifest');assert.equal(manifest.code,200);
   assert.match(manifest.headers['content-type'],/application\/manifest\+json/);
   assert.equal(JSON.parse(manifest.body).display,'standalone');
-  for(const path of ['/icon-192.png','/icon-512.png','/icon.svg'])assert.equal((await call(path)).code,200);
+  for(const path of ['/icon-192.png','/icon-512.png','/icon.svg','/favicon-48.png','/apple-touch-icon.png'])assert.equal((await call(path)).code,200);
 });
