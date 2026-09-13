@@ -14,7 +14,11 @@ The existing localhost history will not appear on the GitHub URL because browser
 
 ## Updating
 
-Edit the source, run `npm run check` and `npm test`, then push to `main`. The workflow publishes only if verification succeeds. Dependabot proposes updates to pinned GitHub Actions. Review code and endpoint changes before merging.
+Edit the source, run `npm run cache:version`, `npm run check` and `npm test`, then push to `main`. The workflow publishes only if verification succeeds. Dependabot proposes updates to pinned GitHub Actions. Review code and endpoint changes before merging.
+
+The manifest and worker use relative paths, so installation works at `/orbit-speed-test/` as well as localhost. Deploy the entire `dist` directory, including manifest, worker, icons and shell assets. The fingerprint check prevents publishing changed assets under an unchanged offline cache version.
+
+Existing installations download a new shell in the background. They show an update notice, then activate it after every Orbit tab/app window is closed. Reopening a tab without closing the other Orbit windows may keep the previous version. No forced reload or mid-test activation occurs. A failed precache leaves the previous installation usable.
 
 ## Hosting limitations
 

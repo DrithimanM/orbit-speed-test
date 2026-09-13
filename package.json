@@ -5,8 +5,9 @@
   "description": "A static, privacy-conscious network speed test",
   "scripts": {
     "test": "node --test tests/*.test.cjs && node tests/integration.cjs",
-    "check": "node --check dist/security.js && node --check dist/core.js && node --check dist/app.js && node --check scripts/serve.mjs",
-    "start": "node scripts/serve.mjs"
+    "check": "node --check dist/security.js && node --check dist/core.js && node --check dist/app.js && node --check scripts/serve.mjs && node --check dist/pwa.js && node --check dist/sw.js && node scripts/version-shell.mjs --check",
+    "start": "node scripts/serve.mjs",
+    "cache:version": "node scripts/version-shell.mjs"
   },
   "engines": {
     "node": ">=22"
