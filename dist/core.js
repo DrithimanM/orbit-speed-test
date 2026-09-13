@@ -5,6 +5,13 @@ const SpeedCore = (() => {
     const m = Math.floor(sorted.length / 2);
     return sorted.length % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
   };
+  function percentile(values, fraction) {
+    if(!values.length)return null;
+    const sorted=[...values].sort((a,b)=>a-b), position=(sorted.length-1)*fraction;
+    const lower=Math.floor(position), upper=Math.ceil(position);
+    return sorted[lower]+(sorted[upper]-sorted[lower])*(position-lower);
+  }
+  const transferCap=(type,direction)=>direction==='upload' ? 8000000 : type==='cloudflare' ? 8000000 : 16000000;
   const jitter = values => values.length < 2 ? 0 : values.slice(1).reduce((sum, value, i) => sum + Math.abs(value - values[i]), 0) / (values.length - 1);
   function distance(a, b) {
     const rad = n => n * Math.PI / 180;
@@ -91,5 +98,5 @@ const SpeedCore = (() => {
   }
   const suggestedLocation = zone => locations.find(city=>city.zones.includes(zone));
   const dialFraction = value => Number.isFinite(value) ? Math.min(1,Math.max(0,value)/1000) : 0;
-  return {median, jitter, distance, ratings, locations, validPoint, locationName, suggestedLocation, dialFraction};
+  return {median, percentile, transferCap, jitter, distance, ratings, locations, validPoint, locationName, suggestedLocation, dialFraction};
 })();
