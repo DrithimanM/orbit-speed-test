@@ -64,3 +64,19 @@ test('new measurement diagnostics stay bounded and legacy history remains valid'
   assert.equal(security.validRecord({...base,streams:4,measurementVersion:2,download:transfer}),true);
   for(const patch of [{streams:8},{measurementVersion:3},{recoveryFrom:'x'.repeat(201)},{download:{...transfer,loadedPings:[Infinity]}},{download:{...transfer,loadedPings:Array(101).fill(1)}},{download:{...transfer,requests:1001}},{download:{...transfer,probeFailures:-1}},{download:{...transfer,ip:'192.0.2.1'}}])assert.equal(security.validRecord({...base,...patch}),false);
 });
+
+test('network labels are bounded and radio generations require a manual source',()=>{
+  const network={type:'5g',source:'manual',effectiveType:'4g',saveData:false};
+  assert.equal(security.validNetwork(network),true);
+  for(const patch of [{source:'browser'},{ip:'192.0.2.1'},{ssid:'home'},{effectiveType:'5g'},{saveData:'false'},{type:'<img>'}])assert.equal(security.validNetwork({...network,...patch}),false);
+  const record={id:'test',date:'2026-09-13T10:00:00Z',server:'Example',status:'running',pings:[],download:null,upload:null,network};
+  assert.equal(security.validRecord(record),true);assert.equal(security.validRecord({...record,network:{...network,ip:'192.0.2.1'}}),false);
+});
+test('reviewed catalog additions and metadata retain exact URL boundaries',()=>{
+  assert.equal(catalog.servers.length,26);assert.ok(catalog.servers.every(security.approvedServer));
+  for(const host of ['man','dal','ash','phx'])assert.ok(security.approvedURL(`https://${host}.speedtest.clouvider.net/backend/empty.php?cors=true`,page));
+  assert.ok(security.approvedURL('https://stat.ripe.net/data/whats-my-ip/data.json',page));
+  assert.ok(security.approvedURL('https://librespeed.org/backend-servers/servers.php',page));
+  assert.throws(()=>security.approvedURL('https://librespeed.org/other',page));
+  assert.throws(()=>security.approvedURL('https://chi.speedtest.clouvider.net/backend/empty.php',page));
+});

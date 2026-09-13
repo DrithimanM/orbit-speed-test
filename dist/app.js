@@ -2,11 +2,13 @@
 const EMBEDDED = typeof window !== 'undefined' && window.self !== window.top;
 const $ = id => document.getElementById(id);
 const MEASURE_MS = 22000;
-const CF = {id:'cloudflare', name:'Cloudflare · automatic edge', type:'cloudflare', base:'https://speed.cloudflare.com/'};
+const CF = {id:'cloudflare', name:'Cloudflare · automatic edge', type:'cloudflare', base:'https://speed.cloudflare.com/',provider:'Cloudflare'};
 let servers = [], locationPoint = null, scanning = false, locating = false;
 let controller = null, connection = {}, current = null, historyRecords = [];
 let selectedId = 'auto';
 let locationAttempt = null, locationSource = 'none';
+let metadataController = null, metadataUpdated = 0;
+const networkAPI = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
 
 function node(tag, text, className) {
   const el = document.createElement(tag);
@@ -18,8 +20,10 @@ const format = value => Number.isFinite(value) ? (value < 10 ? value.toFixed(2) 
 function status(text) { $('status').textContent = text; }
 function setBusy() {
   const busy = scanning || locating || Boolean(controller);
-  for (const id of ['start','scan','locate','server-select','stream-count']) $(id).disabled = busy;
+  for (const id of ['start','scan','locate','server-select','stream-count','server-scope','provider-filter']) $(id).disabled = busy;
   for (const id of ['location-choice','apply-location']) $(id).disabled = scanning || Boolean(controller);
+  $('network-choice').disabled=Boolean(controller);
+  $('refresh-connection').disabled=Boolean(controller || metadataController);
   $('cancel').hidden = !controller;
   $('start-label').textContent = controller ? 'TEST IN FLIGHT' : locating ? 'LOCATING…' : scanning ? 'FINDING ROUTE…' : 'START TEST';
   $('start').setAttribute('aria-label',controller ? 'Speed test in progress' : locating || scanning ? 'Preparing the test route' : 'Start speed test');
@@ -65,28 +69,55 @@ function testURL(server, kind, bytes=0) {
   url.searchParams.set('nonce',crypto.randomUUID());
   return url.href;
 }
-function captureMetadata(response) {
+function captureMetadata(response, target=connection) {
   const get = name => response.headers.get(`cf-meta-${name}`);
-  if (OrbitSecurity.validIP(get('ip'))) connection.ip = get('ip');
-  if (/^[1-9]\d{0,9}$/.test(get('asn') || '') && Number(get('asn'))<=4294967295) connection.asn = get('asn');
-  if (/^[A-Z]{3}$/.test(get('colo') || '')) connection.colo = get('colo');
+  if (OrbitSecurity.validIP(get('ip'))) target.ip = get('ip');
+  if (/^[1-9]\d{0,9}$/.test(get('asn') || '') && Number(get('asn'))<=4294967295) target.asn = get('asn');
+  if (/^[A-Z]{3}$/.test(get('colo') || '')) target.colo = get('colo');
+}
+function currentNetwork() {
+  return SpeedCore.networkSnapshot(networkAPI,$('network-choice').value,navigator.onLine);
+}
+function showNetwork() {
+  const network=currentNetwork();
+  $('network-type').textContent=SpeedCore.networkLabels[network.type];
+  $('network-source').textContent=network.source==='manual' ? 'Selected by you · not device verified' : network.source==='browser' ? 'Reported by this browser' : 'This browser hides the interface type';
+  $('network-estimate').textContent=(network.effectiveType==='unknown' ? 'Performance class not exposed' : `${network.effectiveType.toUpperCase()}-like performance · browser estimate, not the radio generation`)+(network.saveData ? ' · Data Saver is on' : '');
 }
 async function connectionInfo(signal) {
+  metadataController?.abort();
+  const attempt=new AbortController();metadataController=attempt;
+  const combined=signal ? AbortSignal.any([signal,attempt.signal]) : attempt.signal;
+  const next={};connection={};metadataUpdated=0;
+  $('ip').textContent='Detecting…';$('isp').textContent='Looking up network…';$('asn').textContent='—';
+  $('connection-status').textContent='Identifying the public connection via Cloudflare and RIPEstat…';setBusy();
   try {
-    const result = await request(testURL(CF,'ping'),{},signal,6000);
-    captureMetadata(result.response);
-    $('ip').textContent = connection.ip || 'Unavailable';
-    if (!connection.ip) return;
-    const lookup = async (endpoint, resource) => (await request(`https://stat.ripe.net/data/${endpoint}/data.json?resource=${encodeURIComponent(resource)}`,{},signal,5000,true)).body.data;
-    if (!connection.asn) connection.asn = String((await lookup('network-info',connection.ip)).asns?.[0] || '');
-    if (/^[1-9]\d{0,9}$/.test(connection.asn) && Number(connection.asn)<=4294967295) {
-      const holder=(await lookup('as-overview',`AS${connection.asn}`)).holder;
-      if(typeof holder==='string' && holder.length<=200)connection.isp=holder;
+    const lookup = async (endpoint,resource) => (await request(`https://stat.ripe.net/data/${endpoint}/data.json${resource ? '?resource='+encodeURIComponent(resource) : ''}`,{},combined,5000,true)).body.data;
+    try {captureMetadata((await request(testURL(CF,'ping'),{},combined,4000)).response,next);} catch {combined.throwIfAborted();}
+    if(!next.ip) {
+      const ip=(await lookup('whats-my-ip'))?.ip;
+      if(OrbitSecurity.validIP(ip))next.ip=ip;
     }
-  } catch { /* Metadata is optional, independently of test availability. */ }
+    if(!next.ip)throw new Error('Public IP unavailable');
+    if(metadataController===attempt)$('ip').textContent=next.ip;
+    if(!next.asn) {
+      const asns=(await lookup('network-info',next.ip))?.asns;
+      const candidate=Array.isArray(asns) ? asns[0] : undefined;
+      if(/^[1-9]\d{0,9}$/.test(String(candidate)) && Number(candidate)<=4294967295)next.asn=String(candidate);
+    }
+    if(next.asn) {
+      const holder=(await lookup('as-overview',`AS${next.asn}`))?.holder;
+      if(typeof holder==='string' && holder.trim().length && holder.length<=200)next.isp=holder.trim();
+    }
+  } catch { /* Metadata failure never prevents a throughput test. */ }
   finally {
-    $('ip').textContent = connection.ip || 'Unavailable';
-    $('isp').textContent = connection.isp || (connection.asn ? `AS${connection.asn}` : 'Unavailable');
+    if(metadataController===attempt) {
+      connection=next;metadataController=null;
+      metadataUpdated=combined.aborted ? 0 : Date.now();
+      $('ip').textContent=next.ip || 'Unavailable';$('isp').textContent=next.isp || (next.asn ? 'Name lookup unavailable' : 'Lookup unavailable');$('asn').textContent=next.asn ? `AS${next.asn}` : 'Unavailable';
+      $('connection-status').textContent=next.isp ? 'Detected · registered network holder. A VPN or upstream carrier may appear instead of your retail ISP.' : 'Could not fully identify this connection. Refresh to retry; speed tests still work.';
+      setBusy();
+    }
   }
 }
 
@@ -165,7 +196,7 @@ function normalizeServer(item, cities) {
   }
   const rawCoordinates = Object.hasOwn(cities,item.name.split(',')[0]) ? cities[item.name.split(',')[0]] : null;
   const coordinates = Array.isArray(rawCoordinates) && rawCoordinates.length===2 && rawCoordinates.every(Number.isFinite) && Math.abs(rawCoordinates[0])<=90 && Math.abs(rawCoordinates[1])<=180 ? rawCoordinates : null;
-  return {id:`libre-${item.id}`,name:item.name,base:base.href,type:'librespeed',dlURL:item.dlURL,ulURL:item.ulURL,pingURL:item.pingURL,
+  return {id:`libre-${item.id}`,name:item.name,base:base.href,type:'librespeed',provider:base.hostname.endsWith('.clouvider.net')?'Clouvider':base.hostname.endsWith('.sharktech.net')?'Sharktech':'Community / research',dlURL:item.dlURL,ulURL:item.ulURL,pingURL:item.pingURL,
     distance:locationPoint && coordinates ? SpeedCore.distance(locationPoint,coordinates) : null};
 }
 async function probe(server) {
@@ -186,17 +217,21 @@ async function discoverServers() {
   $('scan-status').textContent = 'Loading the public server catalog…';
   try {
     const snapshot = (await request('servers.json',{},undefined,5000,true)).body;
-    let catalog = snapshot.servers;
+    let catalog = Array.isArray(snapshot.servers) ? snapshot.servers : [];
     let catalogLabel = `bundled catalog (${snapshot.updated})`;
     try {
-      const live = (await request('https://raw.githubusercontent.com/librespeed/speedtest/master/server-list.json',{},undefined,5000,true)).body;
-      if (Array.isArray(live) && live.length && live.length<=500) { catalog = live; catalogLabel = 'live LibreSpeed catalog'; }
+      const live = (await request('https://librespeed.org/backend-servers/servers.php',{},undefined,5000,true)).body;
+      if (Array.isArray(live) && live.length && live.length<=500) { catalog = [...live,...catalog]; catalogLabel = 'live LibreSpeed + reviewed additions'; }
     } catch { /* Bundled snapshot keeps discovery available if the catalog host fails. */ }
     const seen=new Set();
-    const candidates = catalog.slice(0,500).flatMap(item => { try { const server=normalizeServer(item,snapshot.cities);if(!server)return [];const key=new URL(server.pingURL,server.base).href;if(seen.has(key))return [];seen.add(key);return [server]; } catch { return []; } });
+    const candidates = catalog.slice(0,1000).flatMap(item => { try { const server=normalizeServer(item,snapshot.cities);if(!server)return [];const key=new URL(server.pingURL,server.base).href;if(seen.has(key))return [];seen.add(key);return [server]; } catch { return []; } });
     candidates.sort((a,b)=>(a.distance ?? Infinity)-(b.distance ?? Infinity));
-    // With location: eight nearest known city centers. Otherwise cover the available catalog.
-    servers = [{...CF},...candidates.slice(0,locationPoint ? 8 : 40)];
+    const provider=$('provider-filter').value;
+    const matches=server=>provider==='independent' ? server.type!=='cloudflare' : ['Cloudflare','Clouvider','Sharktech','Community / research'].includes(provider) ? server.provider===provider : true;
+    const pool=[{...CF},...candidates].filter(matches);
+    const expanded=$('server-scope').value==='all' || !locationPoint;
+    servers=pool.slice(0,expanded ? 40 : (pool[0]?.type==='cloudflare' ? 13 : 12));
+    $('catalog-summary').textContent=`${candidates.length} reviewed public endpoints + Cloudflare · ${expanded ? 'expanded scan' : 'nearby shortlist'} · ${servers.length} candidates in this scan`;
     let done=0, cursor=0;
     const worker = async () => {
       while(cursor < servers.length) {
@@ -222,7 +257,7 @@ function renderServers() {
     const latency=server.available ? `${Math.round(server.latency)} ms` : 'Unavailable';
     const option=new Option(`${server.name} · ${latency}`,server.id);option.disabled=!server.available;select.append(option);
     const button=node('button',undefined,'server-option');button.type='button';button.disabled=!server.available;
-    const text=node('span',server.name);text.append(node('small',server.distance !== null && server.distance !== undefined ? `≈ ${Math.round(server.distance).toLocaleString()} km · city center` : server.type==='cloudflare' ? 'Automatically routed edge' : 'Distance unavailable'));
+    const text=node('span',server.name);text.append(node('small',server.distance !== null && server.distance !== undefined ? `${server.provider} · ≈ ${Math.round(server.distance).toLocaleString()} km` : server.type==='cloudflare' ? 'Cloudflare · automatically routed edge' : `${server.provider} · distance unavailable`));
     button.append(text,node('strong',latency));
     button.classList.toggle('selected',selectedId===server.id || (selectedId==='auto' && server===servers.find(s=>s.available)));
     button.addEventListener('click',()=>{if(controller || scanning) return;selectedId=server.id;renderServers();});list.append(button);
@@ -285,6 +320,7 @@ function delay(ms,signal) {
 }
 function showDiagnostics(record) {
   $('diag-state').textContent=record ? record.status==='complete' ? 'COMPLETE DATASET' : 'LIVE / PARTIAL DATA' : 'WAITING FOR SAMPLES';
+  $('diag-network').textContent=SpeedCore.networkLabel(record?.network);
   $('diag-mode').textContent=record ? `${record.streams || 1} HTTP stream${record.streams===4?'s':''}${record.measurementVersion===2?' · wall time':' · legacy'}` : 'Select a measurement mode';
   $('diag-p95').textContent=record?.pings?.length ? `${format(SpeedCore.percentile(record.pings,.95))} ms · n=${record.pings.length}` : '—';
   for(const direction of ['download','upload']){
@@ -303,7 +339,7 @@ function reservePayload(run,bytes) {
   run.reserved+=bytes;
 }
 async function bandwidth(server,direction,record,run) {
-  const cap=SpeedCore.transferCap(server.type,direction);
+  const cap=SpeedCore.transferCap(server.type,direction,server.provider);
   const payload=direction==='upload' ? new Uint8Array(cap) : null;
   if(payload)for(let offset=0;offset<payload.length;offset+=65536)crypto.getRandomValues(payload.subarray(offset,Math.min(offset+65536,payload.length)));
   const result={bytes:0,transferMs:0,durationMs:0,mbps:0,points:[],loadedPings:[],probeFailures:0,requests:0,retries:0};record[direction]=result;
@@ -356,7 +392,7 @@ async function bandwidth(server,direction,record,run) {
         }
       }
       result.bytes+=direction==='download' ? response.body.byteLength : size;
-      if(server.type==='cloudflare')captureMetadata(response.response);
+      if(server.type==='cloudflare') {const metadata={};captureMetadata(response.response,metadata);if(metadata.colo)connection.colo=metadata.colo;}
       update();
       size=Math.round(Math.min(cap,Math.max(65536,size*1200/response.ms)));
     }
@@ -379,19 +415,19 @@ function failureMessage(error,server,stage) {
   return `${stage} at ${host}: ${reason}.`;
 }
 async function testAttempt(server,run,recoveryFrom) {
-  const record={id:crypto.randomUUID(),date:new Date().toISOString(),status:'running',server:server.name,serverId:server.id,pings:[],download:null,upload:null,streams:run.streams,measurementVersion:2};
+  const record={id:crypto.randomUUID(),date:new Date().toISOString(),status:'running',server:server.name,serverId:server.id,pings:[],download:null,upload:null,streams:run.streams,measurementVersion:2,network:currentNetwork()};
   if(recoveryFrom)record.recoveryFrom=recoveryFrom;
-  current=record;connection={};let stage='Preflight';
+  current=record;let stage='Preflight';
   for(const id of ['download','upload','ping','jitter','live-value'])$(id).textContent='—';
   for(const id of ['download','upload'])$(`${id}-detail`).textContent='Sustained average';
   $('server').textContent=server.name;$('diag-endpoint').textContent=new URL(server.base).hostname;
   $('route-note').textContent=recoveryFrom ? `Previous endpoint failed. Starting a separate test on ${server.name}.` : `Testing ${server.name}.`;
-  $('ip').textContent='Detecting…';$('isp').textContent='Detecting…';$('progress').value=0;
+  $('progress').value=0;
   drawSpeed(record);drawPings();showRatings();showDiagnostics(record);updateDial();
   await saveRecord(record);
   try {
     phase('ping','CHECKING ROUTE');status(`Checking ${server.name}…`);
-    await connectionInfo(controller.signal);controller.signal.throwIfAborted();
+    if(metadataController || Date.now()-metadataUpdated>60000)await connectionInfo(controller.signal);controller.signal.throwIfAborted();
     // Larger than discovery probes, still separate from the timed measurement.
     reservePayload(run,1048576+262144);
     const preflight=await request(testURL(server,'download',1048576),{},controller.signal,10000);
@@ -509,6 +545,11 @@ $('start').addEventListener('click',startTest);
 $('cancel').addEventListener('click',()=>controller?.abort());
 $('retry').addEventListener('click',()=>{selectedId='auto';renderServers();startTest();});
 $('scan').addEventListener('click',discoverServers);
+for(const id of ['server-scope','provider-filter'])$(id).addEventListener('change',()=>{selectedId='auto';discoverServers();});
+$('network-choice').addEventListener('change',showNetwork);
+$('refresh-connection').addEventListener('click',()=>connectionInfo());
+networkAPI?.addEventListener?.('change',showNetwork);
+window.addEventListener('online',showNetwork);window.addEventListener('offline',showNetwork);
 $('locate').addEventListener('click',locate);
 $('change-location').addEventListener('click',()=>{
   const editor=$('location-editor');editor.hidden=!editor.hidden;
@@ -521,6 +562,7 @@ if(EMBEDDED){
 }else{
 drawSpeed();drawPings();showRatings();showDiagnostics();updateDial();
 loadHistory();
+showNetwork();connectionInfo();
 initializeLocation();
 
 } // End top-level page initialization.
