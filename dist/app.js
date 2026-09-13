@@ -6,6 +6,7 @@ const CF = {id:'cloudflare', name:'Cloudflare · automatic edge', type:'cloudfla
 let servers = [], locationPoint = null, scanning = false, locating = false;
 let controller = null, connection = {}, current = null, historyRecords = [];
 let selectedId = 'auto';
+let locationAttempt = null, locationSource = 'none';
 
 function node(tag, text, className) {
   const el = document.createElement(tag);
@@ -18,9 +19,18 @@ function status(text) { $('status').textContent = text; }
 function setBusy() {
   const busy = scanning || locating || Boolean(controller);
   for (const id of ['start','scan','locate','server-select']) $(id).disabled = busy;
+  for (const id of ['location-choice','apply-location']) $(id).disabled = scanning || Boolean(controller);
   $('cancel').hidden = !controller;
-  $('start').textContent = controller ? 'In flight…' : 'Start Test ↗';
+  $('start-label').textContent = controller ? 'TEST IN FLIGHT' : locating ? 'LOCATING…' : scanning ? 'FINDING ROUTE…' : 'START TEST';
+  $('start').setAttribute('aria-label',controller ? 'Speed test in progress' : locating || scanning ? 'Preparing the test route' : 'Start speed test');
   document.body.classList.toggle('running', Boolean(controller));
+  document.body.classList.toggle('preparing', locating || scanning);
+}
+function updateDial(value=0,unit='Mbps') {
+  const fraction=SpeedCore.dialFraction(value);
+  $('dial-needle').setAttribute('transform',`rotate(${-135+fraction*270} 120 120)`);
+  $('dial-fill').setAttribute('stroke-dashoffset',String(100-fraction*100));
+  $('dial-scale').textContent=`0–1,000 ${unit}${value>1000?' · above dial range':''}`;
 }
 function phase(name, label) {
   $('phase').textContent = label;
@@ -77,23 +87,69 @@ async function connectionInfo(signal) {
   }
 }
 
-// Browser location never leaves this page. City coordinates come from the bundled catalog.
+// Device fixes and city suggestions stay in memory; no reverse-geocoding service.
+function showLocation(name,source) {
+  $('location-name').textContent=name;
+  $('location-source').textContent=source;
+}
+function closeLocationEditor() {
+  $('location-editor').hidden=true;
+  $('change-location').setAttribute('aria-expanded','false');
+}
+function initializeLocation() {
+  const select=$('location-choice');
+  select.replaceChildren(new Option('No location filter · compare by latency','none'));
+  for(const [index,city] of SpeedCore.locations.entries())select.append(new Option(city.name,String(index)));
+  let suggested;
+  try {suggested=SpeedCore.suggestedLocation(Intl.DateTimeFormat().resolvedOptions().timeZone);}catch { /* Optional suggestion. */ }
+  if(suggested) {
+    locationPoint=[...suggested.point];locationSource='suggested';
+    select.value=String(SpeedCore.locations.indexOf(suggested));
+    showLocation(suggested.name,'Suggested area · browser timezone, not a device fix');
+  }else{
+    select.value='none';showLocation('No location filter','Choose a city or use your device location');
+  }
+  return locate();
+}
+async function applyLocation() {
+  if(EMBEDDED || scanning || controller)return;
+  const choice=$('location-choice').value;
+  const city=/^\d{1,2}$/.test(choice) ? SpeedCore.locations[Number(choice)] : null;
+  if(choice!=='none' && !city)return;
+  locationAttempt?.abort();locationAttempt=null;locating=false;
+  locationPoint=city ? [...city.point] : null;locationSource=city ? 'manual' : 'none';selectedId='auto';
+  showLocation(city ? city.name : 'No location filter',city ? 'Selected area · approximate city center' : 'Servers compared by measured latency');
+  $('location-status').textContent=city ? 'Using this city to shortlist servers. This changes the search area, not your network location.' : 'Comparing available servers without a distance filter.';
+  closeLocationEditor();setBusy();
+  await discoverServers();
+}
 async function locate() {
   if (EMBEDDED || controller || scanning || locating) return;
-  if (!navigator.geolocation) { $('location-status').textContent = 'Location is unsupported. Scanning by latency instead.'; await discoverServers(); return; }
+  if (!navigator.geolocation) { $('location-status').textContent = 'Device location is unavailable. Using the displayed search area; you can change it.'; await discoverServers(); return; }
+  const attempt=new AbortController();locationAttempt=attempt;
   locating = true; setBusy();
-  $('location-status').textContent = 'Waiting for location permission…';
+  $('location-status').textContent = 'Checking device location… Allow the browser prompt, or choose a search area with Change location.';
   try {
     const position = await new Promise((resolve,reject) => {
-      // Browser permission prompts may not count toward geolocation's own timeout.
-      const timer=setTimeout(()=>reject({code:3}),15000);
-      navigator.geolocation.getCurrentPosition(position=>{clearTimeout(timer);resolve(position);},error=>{clearTimeout(timer);reject(error);},{enableHighAccuracy:false,timeout:12000,maximumAge:300000});
+      const finish=(callback,value)=>{clearTimeout(timer);attempt.signal.removeEventListener('abort',abort);callback(value);};
+      const abort=()=>finish(reject,{name:'AbortError'});
+      // A dismissed permission prompt must not leave the launch control stuck.
+      const timer=setTimeout(()=>finish(reject,{code:3}),15000);
+      attempt.signal.addEventListener('abort',abort,{once:true});
+      try {navigator.geolocation.getCurrentPosition(position=>finish(resolve,position),error=>finish(reject,error),{enableHighAccuracy:false,timeout:12000,maximumAge:300000});}catch(error){finish(reject,error);}
     });
-    locationPoint = [position.coords.latitude,position.coords.longitude];
-    $('location-status').textContent = 'Location enabled. Finding nearby city centers; coordinates stay in this page.';
+    if(attempt.signal.aborted)return;
+    const point=[position.coords.latitude,position.coords.longitude];
+    if(!SpeedCore.validPoint(point))throw new Error('Invalid device location');
+    locationPoint=point;locationSource='device';selectedId='auto';
+    showLocation(SpeedCore.locationName(point),'Device location · approximate area');
+    $('location-status').textContent = 'Device location found. Finding nearby servers; coordinates stay in this page.';
+    closeLocationEditor();
   } catch (error) {
-    $('location-status').textContent = error.code === 1 ? 'Location permission was denied. Enable it in browser site settings or scan without location.' : 'Location could not be determined. Scanning without a distance filter.';
-  } finally { locating = false; setBusy(); }
+    if(attempt.signal.aborted)return;
+    $('location-status').textContent = (error.code === 1 ? 'Location permission was denied. ' : 'Device location could not be determined. ')+(locationPoint ? 'Using the displayed search area. Change it if you are elsewhere.' : 'Comparing servers by latency. You can choose a city instead.');
+  } finally { if(locationAttempt===attempt){locationAttempt=null;locating=false;setBusy();} }
+  if(attempt.signal.aborted)return;
   await discoverServers();
 }
 function normalizeServer(item, cities) {
@@ -223,7 +279,7 @@ async function bandwidth(server,direction,record) {
   const result={bytes:0,transferMs:0,durationMs:0,mbps:0,points:[]};record[direction]=result;
   let size=250000;
   const started=performance.now();
-  phase(direction,direction==='download' ? 'DOWNLINK ACTIVE' : 'UPLINK ACTIVE');
+  updateDial();phase(direction,direction==='download' ? 'DOWNLINK ACTIVE' : 'UPLINK ACTIVE');
   const update=()=>{
     const seconds=(performance.now()-started)/1000;
     $('flight-time').textContent=`T + ${seconds.toFixed(0).padStart(2,'0')} s`;
@@ -246,7 +302,7 @@ async function bandwidth(server,direction,record) {
       result.bytes+=bytes;result.transferMs+=response.ms;result.durationMs=performance.now()-started;
       result.mbps=result.bytes*8/result.durationMs/1000;
       result.points.push({seconds:result.durationMs/1000,mbps:bytes*8/response.ms/1000});
-      $(direction).textContent=format(result.mbps);$('live-value').textContent=format(result.mbps);
+      $(direction).textContent=format(result.mbps);$('live-value').textContent=format(result.mbps);updateDial(result.mbps);
       $(`${direction}-detail`).textContent=`${(result.durationMs/1000).toFixed(1)} s · ${(result.bytes/1000000).toFixed(0)} MB`;
       drawSpeed(record);update();
       size=Math.round(Math.min(direction==='download'?16000000:8000000,Math.max(250000,size*1500/response.ms)));
@@ -270,7 +326,7 @@ async function startTest() {
   for(const id of ['download','upload','ping','jitter','live-value'])$(id).textContent='—';
   for(const id of ['download','upload'])$(`${id}-detail`).textContent='Sustained average';
   $('server').textContent=server.name;$('ip').textContent='Detecting…';$('isp').textContent='Detecting…';$('progress').value=0;
-  drawSpeed(record);drawPings();showRatings();
+  drawSpeed(record);drawPings();showRatings();updateDial();
   await saveRecord(record); // Record the attempt immediately, even if the page closes mid-test.
   try {
     phase('ping','ESTABLISHING CONTACT');status('Identifying your connection…');
@@ -279,17 +335,17 @@ async function startTest() {
     for(let i=0;i<10;i++){
       record.pings.push((await request(testURL(server,'ping'),{},controller.signal)).ms);
       $('ping').textContent=format(SpeedCore.median(record.pings));$('jitter').textContent=format(SpeedCore.jitter(record.pings));
-      $('live-value').textContent=$('ping').textContent;$('progress').value=i+1;drawPings(record.pings);
+      $('live-value').textContent=$('ping').textContent;updateDial(SpeedCore.median(record.pings),'ms');$('progress').value=i+1;drawPings(record.pings);
     }
     record.pingMs=SpeedCore.median(record.pings);record.jitterMs=SpeedCore.jitter(record.pings);
     record.downloadMbps=(await bandwidth(server,'download',record)).mbps;
     record.uploadMbps=(await bandwidth(server,'upload',record)).mbps;
     record.status='complete';record.server=endpointLabel(server);$('server').textContent=record.server;
-    $('progress').value=100;phase(null,'MISSION COMPLETE');status('Test complete. Sustained averages are shown.');showRatings(record);
+    $('progress').value=100;phase(null,'MISSION COMPLETE');$('live-value').textContent=format(record.downloadMbps);updateDial(record.downloadMbps);$('live-label').textContent='Download · sustained average';status('Test complete. Sustained averages are shown.');showRatings(record);
   } catch(error) {
     record.status=controller.signal.aborted ? 'cancelled' : 'failed';
     record.error=record.status==='cancelled' ? 'Test cancelled.' : (error.name==='TimeoutError' ? 'A test request timed out. Try another server.' : error instanceof TypeError ? 'Could not reach the selected server. Try another server or check blockers.' : error.message);
-    document.body.classList.toggle('error',record.status==='failed');phase(null,record.status==='cancelled'?'FLIGHT CANCELLED':'CONNECTION INTERRUPTED');status(`${record.error} Partial traces are shown; no quality rating assigned.`);
+    updateDial();document.body.classList.toggle('error',record.status==='failed');phase(null,record.status==='cancelled'?'FLIGHT CANCELLED':'CONNECTION INTERRUPTED');status(`${record.error} Partial traces are shown; no quality rating assigned.`);
     // Partial curves remain visible, but final result numbers must not imply success.
     for(const id of ['download','upload','ping','jitter','live-value'])$(id).textContent='—';
     for(const id of ['download','upload'])$(`${id}-detail`).textContent='Incomplete · see partial trace';
@@ -346,7 +402,7 @@ function renderHistory() {
       for(const [id,key] of [['download','downloadMbps'],['upload','uploadMbps'],['ping','pingMs'],['jitter','jitterMs']])$(id).textContent=completed ? format(record[key]):'—';
       for(const direction of ['download','upload'])$(`${direction}-detail`).textContent=completed ? `${(record[direction].durationMs/1000).toFixed(1)} s · ${(record[direction].bytes/1000000).toFixed(0)} MB`:'Incomplete · partial trace';
       $('server').textContent=record.server;$('live-value').textContent=completed ? format(record.downloadMbps):'—';$('live-unit').textContent='Mbps';$('flight-time').textContent='HISTORY';
-      phase(null,'RECORDED FLIGHT');status(`Viewing ${new Date(record.date).toLocaleString()} · ${record.status}${record.error ? ' · '+record.error:''}`);
+      updateDial(completed ? record.downloadMbps : 0);phase(null,'RECORDED FLIGHT');status(`Viewing ${new Date(record.date).toLocaleString()} · ${record.status}${record.error ? ' · '+record.error:''}`);
       $('progress').value=completed ? 100:0;
       document.querySelector('.dashboard').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
     });td.append(button);tr.append(td);tbody.append(tr);
@@ -361,12 +417,17 @@ $('start').addEventListener('click',startTest);
 $('cancel').addEventListener('click',()=>controller?.abort());
 $('scan').addEventListener('click',discoverServers);
 $('locate').addEventListener('click',locate);
+$('change-location').addEventListener('click',()=>{
+  const editor=$('location-editor');editor.hidden=!editor.hidden;
+  $('change-location').setAttribute('aria-expanded',String(!editor.hidden));
+  if(!editor.hidden)$('location-choice').focus();
+});
+$('apply-location').addEventListener('click',applyLocation);
 if(EMBEDDED){
   document.body.replaceChildren(node('p','Open Orbit directly in its own tab to use network tests.'));
 }else{
-drawSpeed();drawPings();showRatings();
-// Third-party probes and location access require an explicit user action.
+drawSpeed();drawPings();showRatings();updateDial();
 loadHistory();
-$('scan-status').textContent='Scan servers to find a route, or use your location to narrow the search.';
+initializeLocation();
 
 } // End top-level page initialization.

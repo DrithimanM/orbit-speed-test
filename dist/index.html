@@ -13,12 +13,32 @@
 <main>
   <header><a class="brand" href="#"><span aria-hidden="true">✦</span> ORBIT<span class="brand-sub">NETWORK SPEED TEST</span></a><a href="#history-section" class="history-link">Flight history <span aria-hidden="true">↗</span></a></header>
   <div class="heading"><div><p class="eyebrow">CONNECTION CONTROL</p><h1>Ready for liftoff.</h1></div><p>Real transfers. Sustained speeds.<br>22 seconds in each direction.</p></div>
+  <section class="location-bar" aria-label="Search location">
+    <div class="location-summary"><span class="location-icon" aria-hidden="true">⌖</span><div><p id="location-source">Checking your search area</p><strong id="location-name">Locating you…</strong></div></div>
+    <button id="change-location" class="location-change" aria-expanded="false" aria-controls="location-editor">Change location <span aria-hidden="true">↗</span></button>
+    <div id="location-editor" class="location-editor" hidden><label for="location-choice">Search area</label><div class="location-fields"><select id="location-choice"><option value="none">No location filter · compare by latency</option></select><button id="apply-location">Use this area</button><button id="locate" class="secondary">Use device location</button></div><p class="small">City centers guide the server shortlist. Your location is used only in this tab and does not change your network route.</p></div>
+    <p id="location-status" class="location-note" role="status">Checking device location automatically. Your browser controls permission.</p>
+  </section>
   <section class="dashboard" aria-label="Network test controls and results">
     <div class="flight panel">
       <div class="flight-top"><span id="phase">ON THE LAUNCHPAD</span><span id="flight-time">T + 00 s</span></div>
       <div class="orbit-scene" aria-hidden="true"><div class="orbit-ring"></div><div class="orbit-ring inner"></div><div class="rocket-wrap"><img id="rocket" src="rocket.png" alt=""></div></div>
-      <div class="live-reading"><span id="live-value">—</span><span id="live-unit">Mbps</span></div><p id="live-label">Waiting for launch</p>
-      <div class="actions"><button id="start">Start Test <span aria-hidden="true">↗</span></button><button id="cancel" class="secondary" hidden>Cancel</button></div>
+      <div class="launch-console">
+        <button id="start" class="launch-dial" aria-label="Start speed test" aria-describedby="dial-scale">
+          <svg class="dial-face" viewBox="0 0 240 240" aria-hidden="true">
+            <circle class="dial-orbit" cx="120" cy="120" r="116"/>
+            <path class="dial-track" d="M45.75 194.25 A105 105 0 1 1 194.25 194.25"/>
+            <path id="dial-fill" class="dial-fill" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" d="M45.75 194.25 A105 105 0 1 1 194.25 194.25"/>
+            <g class="dial-ticks"><path d="M120 21v7" transform="rotate(-135 120 120)"/><path d="M120 21v7" transform="rotate(-120 120 120)"/><path d="M120 21v7" transform="rotate(-105 120 120)"/><path d="M120 21v7" transform="rotate(-90 120 120)"/><path d="M120 21v7" transform="rotate(-75 120 120)"/><path d="M120 21v7" transform="rotate(-60 120 120)"/><path d="M120 21v7" transform="rotate(-45 120 120)"/><path d="M120 21v7" transform="rotate(-30 120 120)"/><path d="M120 21v7" transform="rotate(-15 120 120)"/><path d="M120 21v7" transform="rotate(0 120 120)"/><path d="M120 21v7" transform="rotate(15 120 120)"/><path d="M120 21v7" transform="rotate(30 120 120)"/><path d="M120 21v7" transform="rotate(45 120 120)"/><path d="M120 21v7" transform="rotate(60 120 120)"/><path d="M120 21v7" transform="rotate(75 120 120)"/><path d="M120 21v7" transform="rotate(90 120 120)"/><path d="M120 21v7" transform="rotate(105 120 120)"/><path d="M120 21v7" transform="rotate(120 120 120)"/><path d="M120 21v7" transform="rotate(135 120 120)"/></g>
+            <g id="dial-needle" transform="rotate(-135 120 120)"><path class="dial-pointer" d="M116 45 L120 29 L124 45 Z"/></g>
+            <text class="dial-end" x="51" y="211">0</text><text class="dial-end" x="185" y="211">1,000</text>
+          </svg>
+          <span class="dial-content"><span class="dial-kicker" aria-hidden="true">IGNITION CONTROL</span><span class="live-reading"><span id="live-value">—</span><span id="live-unit">Mbps</span></span><span id="start-label">START TEST</span><span class="launch-arrow" aria-hidden="true">↗</span></span>
+        </button>
+        <p id="dial-scale">0–1,000 Mbps</p>
+      </div>
+      <p id="live-label">Waiting for launch</p>
+      <div class="actions"><button id="cancel" class="secondary" hidden>Cancel test</button></div>
       <p id="status" role="status" aria-live="polite">Choose a server or launch with automatic selection.</p>
       <progress id="progress" value="0" max="100" aria-label="Test progress"></progress>
       <p class="small">About a minute. Fast connections can use several GB.</p>
@@ -34,10 +54,9 @@
     </div>
   </section>
   <section class="panel server-panel" aria-labelledby="servers-title">
-    <div class="section-head"><div><p class="eyebrow">GROUND STATIONS</p><h2 id="servers-title">Find your fastest route</h2></div><div class="server-actions"><button id="locate" class="secondary">Use my location</button><button id="scan" class="secondary">Scan servers</button></div></div>
-    <p id="location-status" role="status">Location is optional. Coordinates stay in this page.</p>
+    <div class="section-head"><div><p class="eyebrow">GROUND STATIONS</p><h2 id="servers-title">Find your fastest route</h2></div><div class="server-actions"><button id="scan" class="secondary">Scan servers</button></div></div>
     <label for="server-select">Test server</label><select id="server-select"><option value="auto">Automatic · lowest measured latency</option></select>
-    <p id="scan-status" role="status">Discovering servers…</p><div id="server-list" class="server-list"></div>
+    <p id="scan-status" role="status">Preparing your nearby server shortlist…</p><div id="server-list" class="server-list"></div>
     <dl class="connection"><div><dt>Public IP</dt><dd id="ip">Not measured yet</dd></div><div><dt>ISP / network</dt><dd id="isp">Not measured yet</dd></div><div><dt>Tested endpoint</dt><dd id="server">Automatic selection</dd></div></dl>
     <p class="small">Distances use approximate server city centers. Cloudflare selects its own route. Public servers can be unavailable or block browser requests. ISP lookup sends your public IP to RIPEstat.</p>
   </section>
