@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://speed.cloudflare.com https://stat.ripe.net https://raw.githubusercontent.com https://ams.speedtest.clouvider.net https://amsspeed.sharktech.net https://argalasti.skoultsos.eu https://atl.speedtest.clouvider.net https://chispeed.sharktech.net https://denspeed.sharktech.net https://fra.speedtest.clouvider.net https://la.speedtest.clouvider.net https://lasspeed.sharktech.net https://laxspeed.sharktech.net https://librespeed.a573.net https://librespeed.turris.cz https://lon.speedtest.clouvider.net https://mispeed.rackgenius.com https://nyc.speedtest.clouvider.net https://speed.fs-it.systems https://speed1.e-caps.net https://speedtest.cesnet.cz https://speedtest.kamilszczepanski.com https://speedtest1.sox.rs https://st-be-rm2.infra.garr.it https://www.librespeed.fi; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; require-trusted-types-for 'script'">
+  <meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Sustained network measurements, nearby servers, and connection history.">
+  <title>Orbit · Network Speed Test</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a1022'/%3E%3Cpath d='M18 5 8 18h7l-1 9 10-14h-7z' fill='%238dffda'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css"><script src="security.js" defer></script><script src="core.js" defer></script><script src="app.js" defer></script>
+</head>
+<body>
+<main>
+  <header><a class="brand" href="#"><span aria-hidden="true">✦</span> ORBIT<span class="brand-sub">NETWORK SPEED TEST</span></a><a href="#history-section" class="history-link">Flight history <span aria-hidden="true">↗</span></a></header>
+  <div class="heading"><div><p class="eyebrow">CONNECTION CONTROL</p><h1>Ready for liftoff.</h1></div><p>Real transfers. Sustained speeds.<br>22 seconds in each direction.</p></div>
+  <section class="dashboard" aria-label="Network test controls and results">
+    <div class="flight panel">
+      <div class="flight-top"><span id="phase">ON THE LAUNCHPAD</span><span id="flight-time">T + 00 s</span></div>
+      <div class="orbit-scene" aria-hidden="true"><div class="orbit-ring"></div><div class="orbit-ring inner"></div><div class="rocket-wrap"><img id="rocket" src="rocket.png" alt=""></div></div>
+      <div class="live-reading"><span id="live-value">—</span><span id="live-unit">Mbps</span></div><p id="live-label">Waiting for launch</p>
+      <div class="actions"><button id="start">Start Test <span aria-hidden="true">↗</span></button><button id="cancel" class="secondary" hidden>Cancel</button></div>
+      <p id="status" role="status" aria-live="polite">Choose a server or launch with automatic selection.</p>
+      <progress id="progress" value="0" max="100" aria-label="Test progress"></progress>
+      <p class="small">About a minute. Fast connections can use several GB.</p>
+    </div>
+    <div class="telemetry">
+      <div class="results">
+        <article class="panel" id="download-card"><h2><span class="cyan">↓</span> Download</h2><div class="reading"><output id="download">—</output><span>Mbps</span></div><p id="download-detail">Sustained average</p></article>
+        <article class="panel" id="upload-card"><h2><span class="violet">↑</span> Upload</h2><div class="reading"><output id="upload">—</output><span>Mbps</span></div><p id="upload-detail">Sustained average</p></article>
+        <article class="panel" id="ping-card"><h2><span class="amber">↔</span> Ping</h2><div class="reading"><output id="ping">—</output><span>ms</span></div><p>HTTP round trip</p></article>
+      </div>
+      <section class="panel graph-panel" aria-labelledby="graph-title"><div class="section-head"><h2 id="graph-title">Flight telemetry</h2><span class="legend"><i class="cyan">● Download</i><i class="violet">● Upload</i></span></div><svg id="speed-chart" viewBox="0 0 640 190" role="img" aria-label="Throughput samples over elapsed time"></svg><div class="graph-bottom"><span>Elapsed seconds per phase</span><span>Completed-transfer samples · Mbps</span></div></section>
+      <section class="panel latency-panel"><div><h2>Latency stability</h2><p><strong id="jitter">—</strong> ms jitter <span class="small">· mean consecutive difference</span></p></div><svg id="ping-chart" viewBox="0 0 260 75" role="img" aria-label="Ping samples in milliseconds"></svg></section>
+    </div>
+  </section>
+  <section class="panel server-panel" aria-labelledby="servers-title">
+    <div class="section-head"><div><p class="eyebrow">GROUND STATIONS</p><h2 id="servers-title">Find your fastest route</h2></div><div class="server-actions"><button id="locate" class="secondary">Use my location</button><button id="scan" class="secondary">Scan servers</button></div></div>
+    <p id="location-status" role="status">Location is optional. Coordinates stay in this page.</p>
+    <label for="server-select">Test server</label><select id="server-select"><option value="auto">Automatic · lowest measured latency</option></select>
+    <p id="scan-status" role="status">Discovering servers…</p><div id="server-list" class="server-list"></div>
+    <dl class="connection"><div><dt>Public IP</dt><dd id="ip">Not measured yet</dd></div><div><dt>ISP / network</dt><dd id="isp">Not measured yet</dd></div><div><dt>Tested endpoint</dt><dd id="server">Automatic selection</dd></div></dl>
+    <p class="small">Distances use approximate server city centers. Cloudflare selects its own route. Public servers can be unavailable or block browser requests. ISP lookup sends your public IP to RIPEstat.</p>
+  </section>
+  <section class="quality" aria-labelledby="quality-title"><div class="section-head"><div><p class="eyebrow">MISSION READINESS</p><h2 id="quality-title">What can your connection handle?</h2></div><span id="overall" class="pill">Awaiting a test</span></div><div id="ratings" class="rating-grid"></div><p class="small">Estimates for this test route, not a guarantee. Game-server latency, packet loss, and latency under load are not measured. <a href="https://help.netflix.com/en/node/306" target="_blank" rel="noopener">Streaming guidance</a> · <a href="https://www.nvidia.com/en-gb/geforce-now/system-reqs/" target="_blank" rel="noopener">Cloud gaming requirements</a></p></section>
+  <section id="history-section" class="panel history-panel"><div class="section-head"><div><p class="eyebrow">FLIGHT RECORDER</p><h2>Test history</h2></div><button id="export" class="secondary">Export history</button></div><p id="storage-status" class="small">Tests are saved in this browser, including failed and cancelled attempts. Earlier unsaved tests cannot be recovered.</p><div class="table-wrap"><table><thead><tr><th>When</th><th>Server</th><th>Download</th><th>Upload</th><th>Ping / jitter</th><th>Status</th><th>Details</th></tr></thead><tbody id="history"></tbody></table></div><p id="history-empty">No flights recorded yet. Your next test starts the log.</p></section>
+  <footer><span>ORBIT / LOCAL NETWORK LAB</span><span>22-second sustained transfers · Saved on this device</span></footer>
+</main>
+</body>
+</html>
