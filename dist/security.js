@@ -99,15 +99,20 @@ const OrbitSecurity = (() => {
     if(!/^[a-fA-F0-9:.]+$/.test(value) || !value.includes(':'))return false;
     try {return new URL(`https://[${value}]/`).hostname.startsWith('[');}catch{return false;}
   }
-  const recordKeys=new Set(['id','date','status','server','serverId','pings','download','upload','pingMs','jitterMs','downloadMbps','uploadMbps','finished','error']);
+  const recordKeys=new Set(['id','date','status','server','serverId','pings','download','upload','pingMs','jitterMs','downloadMbps','uploadMbps','finished','error','streams','measurementVersion','recoveryFrom']);
   function validRecord(r) {
     if(!r || typeof r!=='object' || Object.keys(r).some(key=>!recordKeys.has(key)) || typeof r.id!=='string' || r.id.length>100 || typeof r.date!=='string' || !Number.isFinite(Date.parse(r.date)) || typeof r.server!=='string' || r.server.length>200 || !['running','failed','cancelled','complete'].includes(r.status))return false;
+    if(r.streams!==undefined && ![1,4].includes(r.streams))return false;
+    if(r.measurementVersion!==undefined && r.measurementVersion!==2)return false;
+    if(r.recoveryFrom!==undefined && (typeof r.recoveryFrom!=='string' || r.recoveryFrom.length>200))return false;
     if(r.serverId!==undefined && (typeof r.serverId!=='string' || r.serverId.length>100))return false;
     if(r.finished!==undefined && (typeof r.finished!=='string' || !Number.isFinite(Date.parse(r.finished))))return false;
     if(!Array.isArray(r.pings) || r.pings.length>100 || !r.pings.every(finite))return false;
     for(const key of ['download','upload']){
       const data=r[key];if(data==null)continue;
-      if(Object.keys(data).some(k=>!['bytes','durationMs','transferMs','mbps','points'].includes(k)))return false;
+      if(Object.keys(data).some(k=>!['bytes','durationMs','transferMs','mbps','points','loadedPings','probeFailures','requests','retries'].includes(k)))return false;
+      if(data.loadedPings!==undefined && (!Array.isArray(data.loadedPings) || data.loadedPings.length>100 || !data.loadedPings.every(finite)))return false;
+      for(const field of ['probeFailures','requests','retries'])if(data[field]!==undefined && (!Number.isSafeInteger(data[field]) || data[field]<0 || data[field]>1000))return false;
       if(!finite(data.bytes)||!finite(data.durationMs)||!finite(data.transferMs)||!finite(data.mbps)||!Array.isArray(data.points)||data.points.length>1000||!data.points.every(p=>p && Object.keys(p).every(k=>['seconds','mbps'].includes(k)) && finite(p.seconds)&&finite(p.mbps)))return false;
     }
     if(r.status==='complete' && (!r.download || !r.upload || !['downloadMbps','uploadMbps','pingMs','jitterMs'].every(k=>finite(r[k]))))return false;
