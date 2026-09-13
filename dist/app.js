@@ -369,12 +369,4 @@ drawSpeed();drawPings();showRatings();
 loadHistory();
 $('scan-status').textContent='Scan servers to find a route, or use your location to narrow the search.';
 
-if(document.modelContext?.registerTool) {
-  try {Promise.resolve(document.modelContext.registerTool({
-    name:'start_network_speed_test',description:'Run the selected server test for at least 22 seconds per direction, potentially using several GB. Saves a local history entry.',
-    inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},
-    execute:input=>{if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).length)throw new Error('Expected an empty object.');return startTest();}
-  })).catch(()=>{});}catch {/* Optional API. */}
-}
-
 } // End top-level page initialization.
