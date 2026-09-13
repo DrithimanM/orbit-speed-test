@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "Orbit Speed Test",
+  "short_name": "Orbit",
+  "description": "Sustained network measurements and your personal flight history. Developed by HigherIyer.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ],
+  "shortcuts": [{"name": "Flight history", "url": "./#history-section", "description": "Review saved network tests"}]
+}

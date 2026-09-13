@@ -19,14 +19,15 @@ function node(tag, text, className) {
 const format = value => Number.isFinite(value) ? (value < 10 ? value.toFixed(2) : value.toFixed(1)) : '—';
 function status(text) { $('status').textContent = text; }
 function setBusy() {
-  const busy = scanning || locating || Boolean(controller);
+  const offline = navigator.onLine === false;
+  const busy = offline || scanning || locating || Boolean(controller);
   for (const id of ['start','scan','locate','server-select','stream-count','server-scope','provider-filter']) $(id).disabled = busy;
   for (const id of ['location-choice','apply-location']) $(id).disabled = scanning || Boolean(controller);
   $('network-choice').disabled=Boolean(controller);
-  $('refresh-connection').disabled=Boolean(controller || metadataController);
+  $('refresh-connection').disabled=offline || Boolean(controller || metadataController);
   $('cancel').hidden = !controller;
-  $('start-label').textContent = controller ? 'TEST IN FLIGHT' : locating ? 'LOCATING…' : scanning ? 'FINDING ROUTE…' : 'START TEST';
-  $('start').setAttribute('aria-label',controller ? 'Speed test in progress' : locating || scanning ? 'Preparing the test route' : 'Start speed test');
+  $('start-label').textContent = controller ? 'TEST IN FLIGHT' : locating ? 'LOCATING…' : scanning ? 'FINDING ROUTE…' : offline ? 'OFFLINE' : 'START TEST';
+  $('start').setAttribute('aria-label',controller ? 'Speed test in progress' : locating || scanning ? 'Preparing the test route' : offline ? 'Reconnect to run a speed test' : 'Start speed test');
   document.body.classList.toggle('running', Boolean(controller));
   document.body.classList.toggle('preparing', locating || scanning);
 }
@@ -85,6 +86,7 @@ function showNetwork() {
   $('network-estimate').textContent=(network.effectiveType==='unknown' ? 'Performance class not exposed' : `${network.effectiveType.toUpperCase()}-like performance · browser estimate, not the radio generation`)+(network.saveData ? ' · Data Saver is on' : '');
 }
 async function connectionInfo(signal) {
+  if (navigator.onLine === false) return;
   metadataController?.abort();
   const attempt=new AbortController();metadataController=attempt;
   const combined=signal ? AbortSignal.any([signal,attempt.signal]) : attempt.signal;
@@ -143,6 +145,10 @@ function initializeLocation() {
   }else{
     select.value='none';showLocation('No location filter','Choose a city or use your device location');
   }
+  if (navigator.onLine === false) {
+    $('location-status').textContent='Offline · device location and nearby server checks resume when you reconnect.';
+    return;
+  }
   return locate();
 }
 async function applyLocation() {
@@ -158,7 +164,7 @@ async function applyLocation() {
   await discoverServers();
 }
 async function locate() {
-  if (EMBEDDED || controller || scanning || locating) return;
+  if (EMBEDDED || navigator.onLine === false || controller || scanning || locating) return;
   if (!navigator.geolocation) { $('location-status').textContent = 'Device location is unavailable. Using the displayed search area; you can change it.'; await discoverServers(); return; }
   const attempt=new AbortController();locationAttempt=attempt;
   locating = true; setBusy();
@@ -212,7 +218,7 @@ async function probe(server) {
   } catch { server.available = false; server.latency = null; }
 }
 async function discoverServers() {
-  if (scanning || controller || locating) return;
+  if (navigator.onLine === false || scanning || controller || locating) return;
   scanning = true; setBusy();
   $('scan-status').textContent = 'Loading the public server catalog…';
   try {
@@ -461,6 +467,7 @@ async function testAttempt(server,run,recoveryFrom) {
   return record;
 }
 async function startTest() {
+  if(navigator.onLine === false){status('Reconnect to run a speed test. Saved flights are available below.');return {error:'Offline'};}
   if(EMBEDDED || controller || scanning || locating)return {error:'Another operation is running.'};
   if(!servers.length)await discoverServers();
   if(controller || scanning || locating)return {error:'Another operation is running.'};
@@ -549,7 +556,7 @@ for(const id of ['server-scope','provider-filter'])$(id).addEventListener('chang
 $('network-choice').addEventListener('change',showNetwork);
 $('refresh-connection').addEventListener('click',()=>connectionInfo());
 networkAPI?.addEventListener?.('change',showNetwork);
-window.addEventListener('online',showNetwork);window.addEventListener('offline',showNetwork);
+window.addEventListener('online',()=>{showNetwork();setBusy();});window.addEventListener('offline',()=>{showNetwork();setBusy();});
 $('locate').addEventListener('click',locate);
 $('change-location').addEventListener('click',()=>{
   const editor=$('location-editor');editor.hidden=!editor.hidden;
@@ -562,7 +569,14 @@ if(EMBEDDED){
 }else{
 drawSpeed();drawPings();showRatings();showDiagnostics();updateDial();
 loadHistory();
-showNetwork();connectionInfo();
+showNetwork();setBusy();
+if(navigator.onLine === false){
+  $('isp').textContent='Unavailable offline';$('ip').textContent='Unavailable offline';
+  $('connection-status').textContent='Reconnect to refresh IP and ISP information.';
+  $('scan-status').textContent='Offline · reconnect to discover servers.';
+  status('Offline · view or export your saved flights below.');
+  window.addEventListener('online',()=>{connectionInfo();locate();},{once:true});
+}else{connectionInfo();}
 initializeLocation();
 
 } // End top-level page initialization.
