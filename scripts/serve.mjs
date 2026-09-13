@@ -8,9 +8,12 @@ if(!Number.isInteger(port) || port<0 || port>65535)throw new Error('Invalid PORT
 const assets=new Map([
   ['/', ['index.html','text/html; charset=utf-8']],
   ['/index.html',['index.html','text/html; charset=utf-8']],
-  ...['app.js','core.js','security.js'].map(name=>['/'+name,[name,'text/javascript; charset=utf-8']]),
+  ...['app.js','core.js','security.js','pwa.js','sw.js'].map(name=>['/'+name,[name,'text/javascript; charset=utf-8']]),
   ['/styles.css',['styles.css','text/css; charset=utf-8']],
   ['/servers.json',['servers.json','application/json; charset=utf-8']],
+  ['/manifest.webmanifest',['manifest.webmanifest','application/manifest+json; charset=utf-8']],
+  ['/icon.svg',['icon.svg','image/svg+xml']],
+  ...['icon-192.png','icon-512.png'].map(name=>['/'+name,[name,'image/png']]),
   ['/rocket.png',['rocket.png','image/png']],
   ['/higheriyer.png',['higheriyer.png','image/png']],
 ]);
