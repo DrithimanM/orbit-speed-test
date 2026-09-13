@@ -57,3 +57,10 @@ test('Pages workflow uses immutable action revisions and deploys only the static
   for(const action of actions)assert.match(action,/^actions\/[\w-]+@[a-f0-9]{40}$/);
   assert.match(workflow,/persist-credentials: false/);assert.match(workflow,/path: dist/);assert.doesNotMatch(workflow,/pull_request_target/);
 });
+test('new measurement diagnostics stay bounded and legacy history remains valid',()=>{
+  const base={id:'legacy',date:'2026-09-13T10:00:00Z',server:'Example',status:'running',pings:[],download:null,upload:null};
+  assert.equal(security.validRecord(base),true);
+  const transfer={bytes:10,durationMs:100,transferMs:100,mbps:.0008,points:[],loadedPings:[10],probeFailures:0,requests:1,retries:0};
+  assert.equal(security.validRecord({...base,streams:4,measurementVersion:2,download:transfer}),true);
+  for(const patch of [{streams:8},{measurementVersion:3},{recoveryFrom:'x'.repeat(201)},{download:{...transfer,loadedPings:[Infinity]}},{download:{...transfer,loadedPings:Array(101).fill(1)}},{download:{...transfer,requests:1001}},{download:{...transfer,probeFailures:-1}},{download:{...transfer,ip:'192.0.2.1'}}])assert.equal(security.validRecord({...base,...patch}),false);
+});

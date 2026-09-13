@@ -12,8 +12,10 @@ function setup(mode='good',geo='denied') {
   const db={transaction(){const tx={objectStore(){return {put(record){stored.set(record.id,structuredClone(record));queueMicrotask(()=>tx.oncomplete?.());},getAll(){const req={};queueMicrotask(()=>{req.result=[...stored.values()].map(v=>structuredClone(v));req.onsuccess?.();});return req;}};}};return tx;}};
   const context=vm.createContext({console,URL,URLSearchParams,TextDecoder,OrbitSecurity:require('../dist/security.js'),Option:class extends Element {constructor(text,value){super('option');this.textContent=text;this.value=value;}},document:{baseURI:'http://localhost:8000/',getElementById:el,createElement:t=>new Element(t),createElementNS:(_,t)=>new Element(t),body:el('body'),querySelector:()=>el('dashboard')},navigator:{geolocation:geo==='unsupported'?undefined:{getCurrentPosition:(resolve,reject)=>{geoCallbacks={resolve,reject};if(geo==='granted')resolve({coords:{latitude:25.2,longitude:55.27}});else if(geo==='invalid')resolve({coords:{latitude:Infinity,longitude:55}});else if(geo==='denied')reject({code:1});}}},Intl:{DateTimeFormat:()=>({resolvedOptions:()=>({timeZone:'Asia/Dubai'})})},indexedDB:{open(){const req={};queueMicrotask(()=>{if(mode==='storage'){req.error=new Error('quota');req.onerror?.();}else{req.result=db;req.onsuccess?.();}});return req;}},performance:{now:()=>tick},crypto:require('node:crypto').webcrypto,AbortController,AbortSignal,setInterval:()=>1,clearInterval(){},setTimeout:(fn,ms)=>setTimeout(fn,geo==='timeout'?1:ms),clearTimeout,Blob,matchMedia:()=>({matches:true}),fetch:async(url,options)=>{
     urls.push(String(url)); tick+=200;
+    if(String(url).includes('speed.cloudflare.com/__down') && Number(new URL(url).searchParams.get('bytes'))>10000000)throw new TypeError('CORS after HTTP 403');
     if(mode==='failed')throw new TypeError('offline');
     if(mode==='cancel' && String(url).includes('__down'))return new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(new Error('aborted'))));
+    if(mode==='cf-failed' && String(url).includes('speed.cloudflare.com'))throw new TypeError('Endpoint unavailable');
     const headers={get:k=>({'content-type':'application/octet-stream','cf-meta-ip':'192.0.2.1','cf-meta-colo':'DXB'}[k]||null)};
     let payload={};
     if(String(url).endsWith('/servers.json'))payload=JSON.parse(fs.readFileSync('dist/servers.json','utf8'));
@@ -59,11 +61,12 @@ function setup(mode='good',geo='denied') {
   pendingGeo.el('location-choice').value='none';await geoRun(pendingGeo,'applyLocation()');
   assert.equal(geoRun(pendingGeo,'locationPoint'),null);assert.ok(geoRun(pendingGeo,"servers.filter(s=>s.type==='librespeed').every(s=>s.distance===null)"));
   pendingGeo.el('location-choice').value='999';await geoRun(pendingGeo,'applyLocation()');assert.equal(geoRun(pendingGeo,'locationPoint'),null);
-  run('updateDial(500)');assert.equal(app.el('dial-needle').attrs.transform,'rotate(0 120 120)');
-  run('updateDial(2500)');assert.equal(app.el('dial-needle').attrs.transform,'rotate(135 120 120)');assert.match(app.el('dial-scale').textContent,/above dial range/);
+  run('updateDial(500)');assert.equal(app.el('dial-needle').attrs.transform,'translate(148 0)');
+  run('updateDial(2500)');assert.equal(app.el('dial-needle').attrs.transform,'translate(296 0)');assert.match(app.el('dial-scale').textContent,/above dial range/);
   run("updateDial(250,'ms')");assert.match(app.el('dial-scale').textContent,/ms/);
   // Manual server selection must be used for both measurement directions.
   run("selectedId=servers.find(s=>s.type==='librespeed').id");
+  app.el('stream-count').value='1';
   const result=await run('startTest()');
   assert.equal(result.status,'complete');assert.ok(result.download.transferMs>=22000);assert.ok(result.upload.transferMs>=22000);
   assert.equal(result.downloadMbps,result.download.bytes*8/result.download.durationMs/1000);
@@ -71,8 +74,31 @@ function setup(mode='good',geo='denied') {
   assert.ok(app.urls.some(u=>u.includes('ckSize=')));assert.equal(run('historyRecords.length'),1);assert.equal(stored.size,1);
   const again=setup();await vm.runInContext('loadHistory()',again.context);assert.equal(vm.runInContext('historyRecords[0].status',again.context),'complete');
   assert.equal(JSON.stringify([...stored.values()]).includes('192.0.2.1'),false);
+  assert.equal(result.measurementVersion,2);assert.equal(result.streams,1);
+  assert.ok(result.download.loadedPings.length>0);assert.ok(result.upload.loadedPings.length>0);
+  assert.ok(require('../dist/security.js').validRecord(result));
+  const parallel=setup();parallel.el('stream-count').value='4';
+  vm.runInContext('servers=[{...CF,available:true}]',parallel.context);
+  const parallelResult=await vm.runInContext('startTest()',parallel.context);
+  assert.equal(parallelResult.status,'complete');assert.equal(parallelResult.streams,4);
+  assert.ok(parallelResult.download.durationMs>=22000 && parallelResult.upload.durationMs>=22000);
+  assert.equal(parallelResult.downloadMbps,parallelResult.download.bytes*8/parallelResult.download.durationMs/1000);
+  const cfSizes=parallel.urls.filter(u=>u.includes('speed.cloudflare.com/__down')).map(u=>Number(new URL(u).searchParams.get('bytes')));
+  assert.ok(Math.max(...cfSizes)<=8000000);assert.ok(Math.max(...cfSizes)>1000000);
+  const recovery=setup('cf-failed');recovery.el('stream-count').value='1';
+  vm.runInContext("servers=[{...CF,available:true}, {...normalizeServer("+JSON.stringify(JSON.parse(fs.readFileSync('dist/servers.json','utf8')).servers[0])+",{}),available:true}]",recovery.context);
+  const recovered=await vm.runInContext('startTest()',recovery.context);
+  assert.equal(recovered.status,'complete');assert.equal(recovered.recoveryFrom,'Cloudflare · automatic edge');
+  assert.equal(vm.runInContext('historyRecords.length',recovery.context),2);
+  assert.equal(vm.runInContext("historyRecords[0].status",recovery.context),'failed');
+  const manualFailure=setup('cf-failed');
+  vm.runInContext("selectedId='cloudflare';servers=[{...CF,available:true},{...CF,id:'another',available:true}]",manualFailure.context);
+  assert.equal((await vm.runInContext('startTest()',manualFailure.context)).status,'failed');
+  assert.equal(vm.runInContext('historyRecords.length',manualFailure.context),1);
+  assert.equal(run('SpeedCore.percentile([10,20,30,40],.95)'),38.5);
+  assert.throws(()=>run('reservePayload({reserved:7999999999},2)'),/8 GB safety budget/);
   const fail=setup('failed');vm.runInContext('servers=[{...CF,available:true}]',fail.context);const failed=await vm.runInContext('startTest()',fail.context);assert.equal(failed.status,'failed');assert.equal(fail.el('download').textContent,'—');
   const cancel=setup('cancel');vm.runInContext('servers=[{...CF,available:true}]',cancel.context);const pending=vm.runInContext('startTest()',cancel.context);await new Promise(r=>setImmediate(r));vm.runInContext('controller.abort()',cancel.context);assert.equal((await pending).status,'cancelled');
   const quota=setup('storage');vm.runInContext('servers=[{...CF,available:true}]',quota.context);await vm.runInContext('startTest()',quota.context);assert.match(quota.el('storage-status').textContent,/could not be saved/);
-  console.log('PASS: median, jitter, distance, ratings, automatic location, fallback, manual override, late callback protection, dial scale, discovery, manual endpoint selection, 22-second durations, throughput units, graphs, history persistence without IP, failure, cancellation, storage errors.');
+  console.log('PASS: median, jitter, distance, ratings, automatic location, fallback, manual override, late callback protection, dial scale, Cloudflare request cap, parallel throughput, loaded RTT, automatic failover, manual endpoint isolation, discovery, manual endpoint selection, 22-second durations, throughput units, graphs, history persistence without IP, failure, cancellation, storage errors.');
 })().catch(e=>{console.error(e);process.exit(1)});
