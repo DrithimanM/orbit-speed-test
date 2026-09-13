@@ -12,6 +12,18 @@ npm start
 
 Open **http://localhost:8000**. Stop the server with **Ctrl+C**. Node.js 22+ and a modern browser are all you need. There are no packages to install and no build step. The local server includes security headers and serves only public assets.
 
+## Install as an app
+
+Open [the live HTTPS site](https://drithimanm.github.io/orbit-speed-test/) in a regular Chrome or Edge window and choose **Install app** in Orbit’s header. If your browser does not expose the direct prompt, Orbit shows instructions. In Chrome, use **⋮ → Cast, save, and share → Install page as app**; in Edge, use its address-bar install icon or **Apps → Install this site as an app**. The installed Orbit appears in your system launcher and opens in its own window. Embedded browsers may not support installation. Installation always requires your browser’s confirmation.
+
+On Android, use Chrome’s **Add to home screen → Install**. On iPhone/iPad, use Safari’s **Share → Add to Home Screen** (enable **Open as Web App** if offered). On macOS Sonoma 14+, Safari offers **File → Add to Dock**. Browser/version support varies.
+
+After one successful online load, the app shell is saved for offline use. Reopen Orbit offline to review graphs and export saved history. Fresh measurements, ISP information and server discovery require internet. The service worker never intercepts or caches external requests or uploads. An offline launch defers location, discovery and metadata until reconnection; full speed tests still require Start Test.
+
+History remains local to the browser’s storage context and origin. Chrome/Edge installations using the same profile normally share the site’s history. Safari web apps and other browser profiles can use separate storage: export important history before switching. Clearing site data can remove both history and the offline shell. Installing the GitHub site is convenient for daily use; a localhost installation still needs the local server online for initial setup and updates.
+
+Updates download in the background and wait while any Orbit tab or app window is open. After finishing a test, close all Orbit windows and reopen to activate the update. Orbit never forces a reload during a test.
+
 ## Use
 
 1. Orbit requests device location on launch and automatically checks nearby servers. Allow the browser prompt to use a device fix. If permission is denied or detection times out, a **clearly labelled timezone-based city suggestion** is used when available; otherwise servers are compared without a distance filter.
@@ -75,6 +87,9 @@ Ratings are transparent heuristics, not certified scores or tests against actual
 - `dist/rocket.png`: transparent rocket artwork.
 - `dist/higheriyer.png`: HigherIyer footer logo.
 - `dist/core.js`: statistics, provider request caps, distance, ratings, ruler scale, and local city suggestions.
+- `dist/manifest.webmanifest`, `dist/pwa.js`, `dist/sw.js`: installation, offline shell and safe update lifecycle.
+- `dist/icon.svg`, `dist/icon-192.png`, `dist/icon-512.png`: launcher artwork.
+- `scripts/version-shell.mjs`: fingerprints app assets for cache updates.
 - `dist/app.js`: discovery, permission handling, measurements, graph rendering, and IndexedDB history.
 - `dist/servers.json`: fallback public catalog and city-center coordinate mapping.
 
@@ -82,7 +97,7 @@ Change `MEASURE_MS`, request sizes, or rating thresholds to experiment. Update d
 
 ## Security and publishing
 
-Run `npm run check` and `npm test` before publishing. Checks include the Cloudflare size regression, aggregate parallel throughput, loaded RTT, bounded retries, endpoint recovery, history compatibility, and cancellation. See [the security review](SECURITY.md) for controls and remaining limitations and [GitHub Pages deployment](DEPLOY.md) for setup. The app is hardened against the checked cases; it is not guaranteed immune to penetration testing.
+After editing app assets, run `npm run cache:version`, then `npm run check` and `npm test` before publishing. Verification rejects an outdated shell fingerprint. Checks include the Cloudflare size regression, aggregate parallel throughput, loaded RTT, bounded retries, endpoint recovery, history compatibility, and cancellation. See [the security review](SECURITY.md) for controls and remaining limitations and [GitHub Pages deployment](DEPLOY.md) for setup. The app is hardened against the checked cases; it is not guaranteed immune to penetration testing.
 
 ## History compatibility
 

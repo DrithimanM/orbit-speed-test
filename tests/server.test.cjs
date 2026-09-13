@@ -26,4 +26,11 @@ test('local server enforces security headers and exposes only public assets',asy
   assert.equal((await call('/',{},'POST')).code,405);
   assert.equal((await call('/app.js',{},'HEAD')).body,'');
   assert.match((await call('/app.js')).headers['content-type'],/javascript/);
+  for(const path of ['/pwa.js','/sw.js']){
+    const asset=await call(path);assert.equal(asset.code,200);assert.match(asset.headers['content-type'],/javascript/);
+  }
+  const manifest=await call('/manifest.webmanifest');assert.equal(manifest.code,200);
+  assert.match(manifest.headers['content-type'],/application\/manifest\+json/);
+  assert.equal(JSON.parse(manifest.body).display,'standalone');
+  for(const path of ['/icon-192.png','/icon-512.png','/icon.svg'])assert.equal((await call(path)).code,200);
 });
