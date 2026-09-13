@@ -1,6 +1,6 @@
 {
   "source": "https://librespeed.org/backend-servers/servers.php",
-  "updated": "2026-09-12",
+  "updated": "2026-09-13",
   "cities": {
     "Amsterdam": [
       52.37,
@@ -113,6 +113,22 @@
     "Warsaw": [
       52.23,
       21.01
+    ],
+    "Manchester": [
+      53.48,
+      -2.24
+    ],
+    "Dallas": [
+      32.78,
+      -96.8
+    ],
+    "Ashburn": [
+      39.04,
+      -77.49
+    ],
+    "Phoenix": [
+      33.45,
+      -112.07
     ]
   },
   "servers": [
@@ -357,6 +373,46 @@
       "getIpURL": "backend/getIP.php",
       "sponsorName": "A573",
       "sponsorURL": "https://mirror.a573.net/"
+    },
+    {
+      "id": 10001,
+      "name": "Manchester, UK (Clouvider)",
+      "server": "https://man.speedtest.clouvider.net/backend",
+      "dlURL": "garbage.php",
+      "ulURL": "empty.php",
+      "pingURL": "empty.php",
+      "sponsorName": "Clouvider"
+    },
+    {
+      "id": 10002,
+      "name": "Dallas, USA (Clouvider)",
+      "server": "https://dal.speedtest.clouvider.net/backend",
+      "dlURL": "garbage.php",
+      "ulURL": "empty.php",
+      "pingURL": "empty.php",
+      "sponsorName": "Clouvider"
+    },
+    {
+      "id": 10003,
+      "name": "Ashburn, USA (Clouvider)",
+      "server": "https://ash.speedtest.clouvider.net/backend",
+      "dlURL": "garbage.php",
+      "ulURL": "empty.php",
+      "pingURL": "empty.php",
+      "sponsorName": "Clouvider"
+    },
+    {
+      "id": 10004,
+      "name": "Phoenix, USA (Clouvider)",
+      "server": "https://phx.speedtest.clouvider.net/backend",
+      "dlURL": "garbage.php",
+      "ulURL": "empty.php",
+      "pingURL": "empty.php",
+      "sponsorName": "Clouvider"
     }
+  ],
+  "sources": [
+    "https://librespeed.org/backend-servers/servers.php",
+    "https://as62240.net/speedtest"
   ]
 }

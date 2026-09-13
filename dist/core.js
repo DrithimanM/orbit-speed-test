@@ -11,7 +11,7 @@ const SpeedCore = (() => {
     const lower=Math.floor(position), upper=Math.ceil(position);
     return sorted[lower]+(sorted[upper]-sorted[lower])*(position-lower);
   }
-  const transferCap=(type,direction)=>direction==='upload' ? 8000000 : type==='cloudflare' ? 8000000 : 16000000;
+  const transferCap=(type,direction,provider)=>direction==='upload' ? provider==='Clouvider' ? 1000000 : 8000000 : type==='cloudflare' ? 8000000 : 16000000;
   const jitter = values => values.length < 2 ? 0 : values.slice(1).reduce((sum, value, i) => sum + Math.abs(value - values[i]), 0) / (values.length - 1);
   function distance(a, b) {
     const rad = n => n * Math.PI / 180;
@@ -27,6 +27,17 @@ const SpeedCore = (() => {
       {name:'Cloud gaming', grade:d>=25 && p<40 && j<10 ? 'Promising' : d>=15 && p<80 && j<20 ? 'Fair' : 'Limited', detail:'1080p needs about 25 Mbps. Latency to the actual gaming service can differ.'},
       {name:'Video calls', grade:d>=10 && u>=5 && p<100 && j<20 ? 'Excellent' : d>=3 && u>=3 && p<150 && j<30 ? 'Good' : 'Limited', detail:`${u.toFixed(1)} Mbps upload available. Ratings are practical estimates for one call.`},
     ];
+  }
+  const networkLabels={unknown:'Not exposed',wifi:'Wi-Fi',ethernet:'Ethernet',cellular:'Cellular · generation unknown','3g':'3G','4g':'4G / LTE','5g':'5G',bluetooth:'Bluetooth',wimax:'WiMAX',mixed:'Multiple interfaces',other:'Other',none:'Offline'};
+  function networkSnapshot(info,choice='auto',online=true) {
+    const manual=['wifi','ethernet','cellular','3g','4g','5g','other'].includes(choice);
+    const reported=['wifi','ethernet','cellular','bluetooth','wimax','mixed','other','none'].includes(info?.type) ? info.type : 'unknown';
+    const type=online===false ? 'none' : manual ? choice : reported;
+    return {type,source:online===false ? 'browser' : manual ? 'manual' : reported==='unknown' ? 'unavailable' : 'browser',
+      effectiveType:['slow-2g','2g','3g','4g'].includes(info?.effectiveType) ? info.effectiveType : 'unknown',saveData:info?.saveData===true};
+  }
+  function networkLabel(network) {
+    return network ? `${networkLabels[network.type] || 'Not exposed'} · ${network.source==='manual' ? 'user labelled' : network.source==='browser' ? 'browser reported' : 'browser unavailable'}` : 'Not recorded';
   }
   // Approximate city centers. Timezone matches are suggestions, never device fixes.
   const locations = [
@@ -98,5 +109,5 @@ const SpeedCore = (() => {
   }
   const suggestedLocation = zone => locations.find(city=>city.zones.includes(zone));
   const dialFraction = value => Number.isFinite(value) ? Math.min(1,Math.max(0,value)/1000) : 0;
-  return {median, percentile, transferCap, jitter, distance, ratings, locations, validPoint, locationName, suggestedLocation, dialFraction};
+  return {networkSnapshot, networkLabel, networkLabels, median, percentile, transferCap, jitter, distance, ratings, locations, validPoint, locationName, suggestedLocation, dialFraction};
 })();
