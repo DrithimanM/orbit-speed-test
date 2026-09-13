@@ -13,7 +13,7 @@ const assets=new Map([
   ['/servers.json',['servers.json','application/json; charset=utf-8']],
   ['/manifest.webmanifest',['manifest.webmanifest','application/manifest+json; charset=utf-8']],
   ['/icon.svg',['icon.svg','image/svg+xml']],
-  ...['icon-192.png','icon-512.png'].map(name=>['/'+name,[name,'image/png']]),
+  ...['icon-192.png','icon-512.png','favicon-48.png','apple-touch-icon.png'].map(name=>['/'+name,[name,'image/png']]),
   ['/rocket.png',['rocket.png','image/png']],
   ['/higheriyer.png',['higheriyer.png','image/png']],
 ]);
