@@ -8,14 +8,15 @@
   <title>Orbit · Network Speed Test</title>
   <meta name="theme-color" content="#070b14">
   <meta name="apple-mobile-web-app-title" content="Orbit">
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">
+  <link rel="icon" href="icon.svg" type="image/svg+xml" sizes="any">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css"><script src="security.js" defer></script><script src="core.js" defer></script><script src="app.js" defer></script><script src="pwa.js" defer></script>
 </head>
 <body>
 <main>
-  <header><a class="brand" href="#"><span aria-hidden="true">✦</span> ORBIT<span class="brand-sub">NETWORK OBSERVATORY</span></a><nav class="header-actions" aria-label="App"><a href="#history-section" class="history-link">Flight history <span aria-hidden="true">↗</span></a><button id="install-app" class="install-button" type="button"><span aria-hidden="true">⊕</span> Install app</button></nav></header>
+  <header><a class="brand" href="#"><span aria-hidden="true">✦</span> ORBIT<span class="brand-sub">NETWORK OBSERVATORY</span></a><nav class="header-actions" aria-label="App"><a href="#history-section" class="history-link">Flight history <span aria-hidden="true">↗</span></a><button id="install-app" class="install-button" type="button"><span aria-hidden="true">⊕</span> <span id="install-label">Install app</span></button></nav></header>
   <p id="offline-notice" class="app-notice" role="status" hidden>You’re offline. <a href="#history-section">View or export saved flights</a>; reconnect to run a new test.</p>
   <p id="app-update" class="app-notice" role="status" hidden>An Orbit update is ready. Finish your test, then close all Orbit tabs and app windows. Reopen to update.</p>
   <div class="heading"><div><p class="eyebrow">PRECISION / IN MOTION</p><h1>Take your network<br>to its limits.</h1></div><p>Sustained throughput. Latency under load.<br>A closer look at the connection you actually have.</p></div>
@@ -72,10 +73,12 @@
 <dialog id="install-dialog" aria-labelledby="install-title" aria-describedby="install-description">
   <div class="section-head"><div class="install-identity"><img src="icon-192.png" alt="" width="48" height="48"><h2 id="install-title">Orbit, ready to launch.</h2></div><button id="close-install" class="secondary" type="button" aria-label="Close install instructions">✕</button></div>
   <p id="install-description">Add Orbit to your app launcher and open it in its own window.</p>
-  <ul class="install-steps"><li><strong>Chrome / Edge on a computer</strong><span>Open this site in your regular browser. Choose its address-bar install icon, or find “Install page as app” / “Install this site as an app” in the browser menu.</span></li><li><strong>Android</strong><span>Use Chrome’s menu → Add to home screen → Install.</span></li><li><strong>iPhone / iPad</strong><span>Open in Safari → Share → Add to Home Screen. Keep “Open as Web App” enabled if shown.</span></li><li><strong>Mac with Safari</strong><span>On macOS Sonoma 14 or later, choose File → Add to Dock.</span></li></ul>
+  <div class="app-maintenance"><span id="app-mode" class="micro-label">Browser tab</span><button id="check-app-update" class="secondary" type="button">Check for updates</button></div>
+  <p id="install-status" class="small" role="status">Preparing offline access…</p>
+  <p id="install-feedback" class="small" role="status" hidden></p>
+  <details id="install-help" open><summary>Installation &amp; icon help</summary><ul class="install-steps"><li><strong>Chrome / Edge on a computer</strong><span>Open this site in your regular browser. Choose its address-bar install icon, or find “Install page as app” / “Install this site as an app” in the browser menu.</span></li><li><strong>Android</strong><span>Use Chrome’s menu → Add to home screen → Install.</span></li><li><strong>iPhone / iPad</strong><span>Open in Safari → Share → Add to Home Screen. Keep “Open as Web App” enabled if shown.</span></li><li><strong>Mac with Safari</strong><span>On macOS Sonoma 14 or later, choose File → Add to Dock.</span></li></ul><p class="small">Missing an icon after installing with a Flatpak browser on Linux? Its desktop launcher may point to a sandbox path that does not exist on the host. The browser’s exported icon and launcher path need to agree.</p></details>
   <p class="small">Embedded browsers and some desktop browsers do not offer app installation. If no install option appears, use a regular Chrome or Edge window.</p>
   <p class="small">History stays in this browser’s storage. Safari app installs and other profiles may have separate history; export important flights before switching. Offline mode opens recorded flights; fresh speed tests, ISP details and server searches need internet.</p>
-  <p id="install-status" class="small" role="status">Preparing offline access…</p>
 </dialog>
 </body>
 </html>
