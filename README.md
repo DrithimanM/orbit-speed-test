@@ -22,7 +22,13 @@ After one successful online load, the app shell is saved for offline use. Reopen
 
 History remains local to the browser’s storage context and origin. Chrome/Edge installations using the same profile normally share the site’s history. Safari web apps and other browser profiles can use separate storage: export important history before switching. Clearing site data can remove both history and the offline shell. Installing the GitHub site is convenient for daily use; a localhost installation still needs the local server online for initial setup and updates.
 
+Installed windows retain an **App info** button in the header. Open it to check offline readiness, get installation help, or choose **Check for updates**. Manual update checks wait until tests/server searches finish and require connectivity. Failed offline setup and update downloads show a retry message.
+
 Updates download in the background and wait while any Orbit tab or app window is open. After finishing a test, close all Orbit windows and reopen to activate the update. Orbit never forces a reload during a test.
+
+## Linux launcher icons
+
+The site supplies PNG app icons, a 48 px PNG favicon fallback, a 180 px Apple touch icon and icons for the Flight history shortcut. If a Flatpak browser installs Orbit but the desktop icon is missing, inspect the exported `.desktop` file: its `Icon=` path must resolve on the host. A sandbox-only path can be wrong even when the browser downloaded the correct icons. Correct the launcher to reference the matching exported host icon; preserve its app ID and launch arguments. Desktop entries use double quotes for quoted `Exec` arguments. Validate the repaired entry with `desktop-file-validate`. A website manifest cannot fix a path exported incorrectly by a browser package.
 
 ## Use
 
