@@ -12,6 +12,7 @@ const assets=new Map([
   ['/styles.css',['styles.css','text/css; charset=utf-8']],
   ['/servers.json',['servers.json','application/json; charset=utf-8']],
   ['/rocket.png',['rocket.png','image/png']],
+  ['/higheriyer.png',['higheriyer.png','image/png']],
 ]);
 const html=await readFile(new URL('index.html',root),'utf8');
 const policy=html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
