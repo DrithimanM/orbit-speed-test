@@ -3,82 +3,868 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://speed.cloudflare.com https://stat.ripe.net https://librespeed.org https://man.speedtest.clouvider.net https://dal.speedtest.clouvider.net https://ash.speedtest.clouvider.net https://phx.speedtest.clouvider.net https://ams.speedtest.clouvider.net https://amsspeed.sharktech.net https://argalasti.skoultsos.eu https://atl.speedtest.clouvider.net https://chispeed.sharktech.net https://denspeed.sharktech.net https://fra.speedtest.clouvider.net https://la.speedtest.clouvider.net https://lasspeed.sharktech.net https://laxspeed.sharktech.net https://librespeed.a573.net https://librespeed.turris.cz https://lon.speedtest.clouvider.net https://mispeed.rackgenius.com https://nyc.speedtest.clouvider.net https://speed.fs-it.systems https://speed1.e-caps.net https://speedtest.cesnet.cz https://speedtest.kamilszczepanski.com https://speedtest1.sox.rs https://st-be-rm2.infra.garr.it https://www.librespeed.fi; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self'; manifest-src 'self'; trusted-types orbit-worker; require-trusted-types-for 'script'">
-  <meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="description" content="Sustained network measurements, nearby servers, and connection history.">
-  <title>Orbit · Network Speed Test</title>
-  <meta name="theme-color" content="#070b14">
+  <title>Orbit · Network Observatory</title>
+  <meta name="theme-color" content="#0c0e12">
   <meta name="apple-mobile-web-app-title" content="Orbit">
   <link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">
   <link rel="icon" href="icon.svg" type="image/svg+xml" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css"><script src="security.js" defer></script><script src="core.js" defer></script><script src="app.js" defer></script><script src="pwa.js" defer></script>
+  <link rel="stylesheet" href="styles.css"><script src="security.js" defer></script><script src="core.js" defer></script><script src="telemetry.js" defer></script><script src="ui.js" defer></script><script src="app.js" defer></script><script src="pwa.js" defer></script>
 </head>
 <body>
-<main>
-  <header><a class="brand" href="#"><span aria-hidden="true">✦</span> ORBIT<span class="brand-sub">NETWORK OBSERVATORY</span></a><nav class="header-actions" aria-label="App"><a href="#history-section" class="history-link">Flight history <span aria-hidden="true">↗</span></a><button id="install-app" class="install-button" type="button"><span aria-hidden="true">⊕</span> <span id="install-label">Install app</span></button></nav></header>
-  <p id="offline-notice" class="app-notice" role="status" hidden>You’re offline. <a href="#history-section">View or export saved flights</a>; reconnect to run a new test.</p>
-  <p id="app-update" class="app-notice" role="status" hidden>An Orbit update is ready. Finish your test, then close all Orbit tabs and app windows. Reopen to update.</p>
-  <div class="heading"><div><p class="eyebrow">PRECISION / IN MOTION</p><h1>Take your network<br>to its limits.</h1></div><p>Sustained throughput. Latency under load.<br>A closer look at the connection you actually have.</p></div>
-  <section class="location-bar" aria-label="Search location">
-    <div class="location-summary"><span class="location-icon" aria-hidden="true">⌖</span><div><p id="location-source">Checking your search area</p><strong id="location-name">Locating you…</strong></div></div>
-    <button id="change-location" class="location-change" aria-expanded="false" aria-controls="location-editor">Change location <span aria-hidden="true">↗</span></button>
-    <div id="location-editor" class="location-editor" hidden><label for="location-choice">Search area</label><div class="location-fields"><select id="location-choice"><option value="none">No location filter · compare by latency</option></select><button id="apply-location">Use this area</button><button id="locate" class="secondary">Use device location</button></div><p class="small">City centers guide the server shortlist. Your location is used only in this tab and does not change your network route.</p></div>
-    <p id="location-status" class="location-note" role="status">Checking device location automatically. Your browser controls permission.</p>
-  </section>
-  <section class="connection-panel" aria-label="Your connection">
-    <div class="connection-overview"><div><p class="eyebrow">YOUR ISP / NETWORK</p><strong id="isp">Looking up network…</strong></div><div><p class="eyebrow">ACCESS TYPE</p><strong id="network-type">Not exposed</strong><span id="network-source" class="small">Checking browser support…</span></div><button id="refresh-connection" class="secondary" aria-label="Refresh IP and ISP information">Refresh ↻</button></div>
-    <details class="connection-details"><summary>Connection details &amp; network type</summary><div class="connection-detail-grid"><div><label for="network-choice">Label this connection</label><select id="network-choice"><option value="auto">Automatic · browser detection</option><option value="wifi">Wi-Fi</option><option value="ethernet">Ethernet</option><option value="cellular">Cellular · unknown generation</option><option value="3g">3G</option><option value="4g">4G / LTE</option><option value="5g">5G</option><option value="other">Other</option></select><p class="small">Manual labels are saved with each test. Browsers cannot reliably identify the cellular generation, Wi-Fi standard, SSID or router uplink.</p></div><dl><div><dt>Public IP</dt><dd id="ip">Detecting…</dd></div><div><dt>Autonomous system</dt><dd id="asn">—</dd></div></dl></div><p id="network-estimate" class="small"></p><p class="small">A browser’s “4G-like” class estimates recent performance; it can appear on Wi-Fi, Ethernet or 5G. It is never used to infer your access technology.</p></details>
-    <p id="connection-status" class="small" role="status">Identifying your public connection…</p><p class="connection-privacy">IP / ISP lookup runs on load through Cloudflare and RIPEstat. Your IP is sent to RIPEstat; IP and ISP stay out of saved history.</p>
-  </section>
-  <section class="dashboard" aria-label="Network test controls and results">
-    <div class="flight panel">
-      <div class="flight-top"><span class="flight-phase"><i aria-hidden="true"></i><span id="phase">SYSTEM READY</span></span><span id="flight-time">T + 00 s</span></div>
-      <div class="orbit-scene" aria-hidden="true"><div class="stars stars-near"></div><div class="stars stars-far"></div><div class="orbital orbital-one"></div><div class="orbital orbital-two"></div><div class="planet-horizon"></div><div class="rocket-wrap"><div class="engine-plume"></div><img id="rocket" src="rocket.png" alt="" width="512" height="512"></div><span class="scene-coordinate">LINK / ACTIVE TRAJECTORY</span></div>
-      <div class="flight-content">
-        <p class="eyebrow">NETWORK FLIGHT DECK</p>
-        <div class="live-reading"><span id="live-value">—</span><span id="live-unit">Mbps</span></div>
-        <p id="live-label">Ready to measure your connection</p>
-        <div class="speed-ruler"><svg viewBox="0 0 320 40" aria-hidden="true"><path class="ruler-track" d="M12 12H308"/><path id="dial-fill" class="ruler-fill" d="M12 12H308" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/><path class="ruler-ticks" d="M12 8v8 M86 8v8 M160 8v8 M234 8v8 M308 8v8"/><g id="dial-needle" transform="translate(0 0)"><path d="M8 0L12 6L16 0Z"/></g><text x="12" y="35">0</text><text x="86" y="35">250</text><text x="160" y="35">500</text><text x="234" y="35">750</text><text x="302" y="35">1G</text></svg><p id="dial-scale">0–1,000 Mbps</p></div>
-        <div class="launch-actions"><button id="start" class="launch-button" aria-label="Start speed test"><span class="launch-icon" aria-hidden="true">↗</span><span id="start-label">START TEST</span><span class="button-chevrons" aria-hidden="true">››</span></button><button id="cancel" class="secondary" hidden>Cancel test</button><button id="retry" class="secondary" hidden>Try next reachable server</button></div>
-        <div class="measurement-mode"><label for="stream-count">HTTP mode</label><select id="stream-count"><option value="4">4 streams · capacity</option><option value="1">1 stream · path</option></select><span>22 s / direction</span></div>
+    <a class="skip-link" href="#test-deck">Skip to test controls</a>
+    <main>
+      <header class="app-header">
+        <a class="brand" href="#overview" aria-label="Orbit Network Observatory"
+          ><img src="icon.svg" alt="" width="38" height="38" /><span
+            >Orbit<small>NETWORK OBSERVATORY</small></span
+          ></a
+        >
+        <div class="header-actions">
+          <span class="local-indicator"><i></i> On-device history</span
+          ><button id="install-app" class="secondary" type="button">
+            <span aria-hidden="true">⊕</span>
+            <span id="install-label">Install app</span>
+          </button>
+        </div>
+      </header>
+      <p id="offline-notice" class="app-notice" role="status" hidden>
+        You’re offline. <a href="#history-section">View saved flights</a>;
+        reconnect to test.
+      </p>
+      <p id="app-update" class="app-notice" role="status" hidden>
+        An update is ready. Finish your test, close all Orbit windows, then
+        reopen.
+      </p>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">SIGNAL. WITHOUT THE NOISE.</p>
+          <h1>Your connection. In focus.</h1>
+        </div>
+        <button
+          class="connection-badge"
+          id="inspect-connection"
+          aria-label="Inspect ISP and connection details"
+        >
+          <span class="connection-dot" aria-hidden="true"></span
+          ><span
+            ><strong id="isp">Looking up network…</strong
+            ><small id="network-type">Detecting access type…</small></span
+          ><span aria-hidden="true">↗</span>
+        </button>
       </div>
-      <div class="flight-bottom"><p id="status" role="status" aria-live="polite">Choose a route and launch a sustained test.</p><progress id="progress" value="0" max="100" aria-label="Test progress"></progress><div class="flight-notes"><span id="route-note">Automatic · lowest measured RTT</span><span>High data use · up to 8 GB safety budget</span></div></div>
+
+      <section
+        class="dashboard panel"
+        id="test-deck"
+        aria-label="Network test controls and results"
+      >
+        <div class="deck-top">
+          <span class="flight-phase"
+            ><i aria-hidden="true"></i
+            ><span id="phase">SYSTEM READY</span></span
+          ><span class="deck-duration"
+            >22 s per direction
+            <button
+              class="info-button"
+              type="button"
+              data-info="measurement"
+              aria-label="About test duration and data use"
+            >
+              i
+            </button></span
+          >
+        </div>
+        <div class="test-deck">
+          <div class="gauge-wrap">
+            <svg class="speedometer" viewBox="0 0 360 330" aria-hidden="true">
+              <defs>
+                <linearGradient id="gauge-gradient" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#72efd4" />
+                  <stop offset="65%" stop-color="#5daeff" />
+                  <stop offset="100%" stop-color="#ac9cff" />
+                </linearGradient>
+              </defs>
+              <circle class="gauge-orbit" cx="180" cy="171" r="146" />
+              <path
+                class="gauge-track"
+                d="M89.49 261.51 A128 128 0 1 1 270.51 261.51"
+                pathLength="100"
+              />
+              <path
+                id="dial-fill"
+                class="gauge-fill"
+                d="M89.49 261.51 A128 128 0 1 1 270.51 261.51"
+                pathLength="100"
+                stroke-dasharray="100"
+                stroke-dashoffset="100"
+              />
+              <g id="dial-needle" transform="rotate(-135 180 171)">
+                <circle cx="180" cy="43" r="5" class="gauge-tip" />
+              </g>
+              <text x="82" y="288">0</text>
+              <text x="24" y="123">250</text>
+              <text x="180" y="18">500</text>
+              <text x="334" y="123">750</text>
+              <text x="280" y="288">1G</text>
+            </svg>
+            <div class="gauge-reading">
+              <div class="rocket-beacon" aria-hidden="true">
+                <img
+                  id="rocket"
+                  src="rocket.png"
+                  alt=""
+                  width="60"
+                  height="60"
+                /><span class="exhaust"></span>
+              </div>
+              <div class="live-reading"><output id="live-value">—</output></div>
+              <span id="live-unit">Mbps</span>
+              <p id="live-label">Ready for takeoff</p>
+            </div>
+            <p id="dial-scale" class="sr-only">0–1,000 Mbps</p>
+            <span id="flight-time" class="flight-time">T + 00 s</span>
+          </div>
+          <div class="launch-deck">
+            <p class="eyebrow">NETWORK FLIGHT DECK</p>
+            <h2>Explore your<br />connection’s capacity.</h2>
+            <p class="deck-subtitle">Sustained speed. Real-world latency.</p>
+            <div class="compact-controls">
+              <button
+                id="open-routes"
+                class="select-pill"
+                type="button"
+                aria-haspopup="dialog"
+              >
+                <span aria-hidden="true">⌖</span
+                ><span id="route-badge">Auto · finding route</span
+                ><span aria-hidden="true">⌄</span></button
+              ><label class="select-pill streams-pill"
+                ><span aria-hidden="true">ϟ</span
+                ><span class="sr-only">Parallel HTTP streams</span
+                ><select id="stream-count">
+                  <option value="4">4 Streams</option>
+                  <option value="1">1 Stream</option></select
+                ><span aria-hidden="true">⌄</span></label
+              >
+            </div>
+            <div class="launch-actions">
+              <button
+                id="start"
+                class="launch-button"
+                aria-label="Launch speed test"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m7 17 10-10M7 7h10v10" /></svg
+                ><span id="start-label">Launch Test</span></button
+              ><button id="cancel" class="secondary" hidden>Cancel test</button
+              ><button id="retry" class="secondary" hidden>
+                Try another route
+              </button>
+            </div>
+            <p class="launch-caption">
+              High data use · up to 8 GB
+              <button
+                type="button"
+                class="info-button"
+                data-info="measurement"
+                aria-label="About the data budget"
+              >
+                i
+              </button>
+            </p>
+          </div>
+        </div>
+        <div class="metric-strip">
+          <article id="download-card">
+            <h3><span class="cyan">↓</span> Download</h3>
+            <div><output id="download">—</output><span>Mbps</span></div>
+            <p id="download-detail">Sustained average</p>
+          </article>
+          <article id="upload-card">
+            <h3><span class="violet">↑</span> Upload</h3>
+            <div><output id="upload">—</output><span>Mbps</span></div>
+            <p id="upload-detail">Sustained average</p>
+          </article>
+          <article id="ping-card">
+            <h3>
+              <span class="blue">↔</span> Ping
+              <button
+                class="info-button"
+                data-info="latency"
+                aria-label="About HTTP ping"
+              >
+                i
+              </button>
+            </h3>
+            <div><output id="ping">—</output><span>ms</span></div>
+            <p>Idle HTTP RTT</p>
+          </article>
+          <article id="jitter-card">
+            <h3>
+              <span class="amber">∿</span> Jitter
+              <button
+                class="info-button"
+                data-info="jitter"
+                aria-label="About jitter"
+              >
+                i
+              </button>
+            </h3>
+            <div><output id="jitter">—</output><span>ms</span></div>
+            <p>Consecutive variation</p>
+          </article>
+        </div>
+        <div class="deck-status">
+          <p id="status" role="status" aria-live="polite">
+            Choose a route and launch a sustained test.
+          </p>
+          <progress
+            id="progress"
+            value="0"
+            max="100"
+            aria-label="Test progress"
+          ></progress>
+        </div>
+      </section>
+
+      <div class="view-navigation">
+        <div
+          class="segmented-control"
+          role="tablist"
+          aria-label="Observatory views"
+        >
+          <button
+            id="tab-overview"
+            role="tab"
+            aria-selected="true"
+            aria-controls="view-overview"
+            tabindex="0"
+            data-view="overview"
+          >
+            Overview</button
+          ><button
+            id="tab-telemetry"
+            role="tab"
+            aria-selected="false"
+            aria-controls="view-telemetry"
+            tabindex="-1"
+            data-view="telemetry"
+          >
+            <span class="desktop-label">Telemetry &amp; Nerd Stats</span
+            ><span class="mobile-label">Telemetry</span></button
+          ><button
+            id="tab-history"
+            role="tab"
+            aria-selected="false"
+            aria-controls="view-history"
+            tabindex="-1"
+            data-view="history"
+          >
+            Flight History
+          </button>
+        </div>
+        <span class="view-context" id="view-context">LIVE OBSERVATORY</span>
+      </div>
+
+      <section
+        id="view-overview"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-overview"
+        tabindex="0"
+      >
+        <div class="overview-top">
+          <article class="panel summary-card">
+            <div class="section-head">
+              <h2>Flight summary</h2>
+              <span id="summary-state" class="status-pill">No flight yet</span>
+            </div>
+            <h3 id="summary-title">A clearer view starts here.</h3>
+            <p id="summary-detail">
+              Launch a test to record bandwidth and latency on your route.
+            </p>
+            <div class="summary-bottom">
+              <span id="summary-time">Saved on this device</span
+              ><button class="text-button" id="inspect-flight">
+                Inspect flight <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </article>
+          <article class="panel readiness-card">
+            <div class="section-head">
+              <h2>Mission readiness</h2>
+              <button
+                class="info-button"
+                data-info="readiness"
+                aria-label="About readiness estimates"
+              >
+                i
+              </button>
+            </div>
+            <div id="ratings" class="readiness-grid"></div>
+            <p id="overall" class="small">Awaiting a test</p>
+          </article>
+        </div>
+        <article class="panel graph-panel">
+          <div class="section-head">
+            <div>
+              <h2>Throughput timeline</h2>
+              <p class="small" id="overview-trace-label">
+                Your next flight, plotted in real time.
+              </p>
+            </div>
+            <span class="legend"
+              ><span class="cyan">● Download</span
+              ><span class="violet">● Upload</span></span
+            >
+          </div>
+          <svg
+            id="speed-chart"
+            viewBox="0 0 900 220"
+            role="img"
+            aria-label="Throughput timeline, megabits per second over elapsed seconds"
+          ></svg>
+          <div class="graph-bottom">
+            <span>Time within each transfer phase</span
+            ><button class="text-button" id="open-telemetry">
+              Explore telemetry ↗
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <section
+        id="view-telemetry"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-telemetry"
+        tabindex="0"
+        hidden
+      >
+        <div class="section-head view-heading">
+          <div>
+            <h2>Telemetry &amp; route inspector</h2>
+            <p id="route-note" class="small">
+              Automatic · lowest measured HTTP RTT
+            </p>
+          </div>
+          <span id="diag-state" class="status-pill">Waiting for samples</span>
+        </div>
+        <div class="telemetry-grid">
+          <article class="panel latency-card">
+            <div class="section-head">
+              <h3>Latency under load</h3>
+              <button
+                class="info-button"
+                data-info="bufferbloat"
+                aria-label="About loaded latency and bufferbloat"
+              >
+                i
+              </button>
+            </div>
+            <div class="loaded-grid">
+              <div>
+                <span>↓ Download load</span
+                ><strong id="loaded-download">—</strong
+                ><small id="loaded-download-detail">Waiting for samples</small>
+              </div>
+              <div>
+                <span>↑ Upload load</span><strong id="loaded-upload">—</strong
+                ><small id="loaded-upload-detail">Waiting for samples</small>
+              </div>
+            </div>
+            <p id="bufferbloat-summary" class="small">
+              Median loaded RTT compared with idle.
+            </p>
+          </article>
+          <article class="panel latency-card">
+            <div class="section-head">
+              <h3>Idle latency distribution</h3>
+              <button
+                class="info-button"
+                data-info="percentiles"
+                aria-label="About latency percentiles"
+              >
+                i
+              </button>
+            </div>
+            <div class="percentile-grid">
+              <div><span>P50</span><strong id="diag-p50">—</strong></div>
+              <div><span>P95</span><strong id="diag-p95">—</strong></div>
+              <div><span>P99</span><strong id="diag-p99">—</strong></div>
+            </div>
+            <svg
+              id="ping-chart"
+              viewBox="0 0 260 75"
+              role="img"
+              aria-label="Idle HTTP RTT samples"
+            ></svg>
+            <p id="percentile-count" class="small">No samples recorded</p>
+          </article>
+        </div>
+        <article class="panel graph-panel inspector-graph">
+          <div class="section-head">
+            <div>
+              <h2>Transfer time series</h2>
+              <p id="trace-status" class="small">No measured samples yet</p>
+            </div>
+            <span class="legend"
+              ><span class="cyan">● Download</span
+              ><span class="violet">● Upload</span></span
+            >
+          </div>
+          <div class="scrub-chart">
+            <svg
+              id="telemetry-chart"
+              viewBox="0 0 900 270"
+              role="img"
+              aria-label="Detailed throughput samples with a time scrubber"
+            ></svg
+            ><output id="chart-tooltip" class="chart-tooltip" hidden></output>
+          </div>
+          <div class="scrubber-row">
+            <label for="chart-scrubber">Inspect time</label
+            ><input
+              id="chart-scrubber"
+              type="range"
+              min="0"
+              max="22"
+              step="0.1"
+              value="0"
+              disabled
+              aria-describedby="scrubber-value"
+            /><output id="scrubber-value">No samples</output>
+          </div>
+        </article>
+        <article class="panel inspector-card">
+          <div class="section-head">
+            <h2>Measurement details</h2>
+            <button
+              class="info-button"
+              data-info="streams"
+              aria-label="About HTTP streams and transport connections"
+            >
+              i
+            </button>
+          </div>
+          <dl class="data-grid">
+            <div>
+              <dt>HTTP transfer mode</dt>
+              <dd id="diag-mode">Not measured</dd>
+            </div>
+            <div>
+              <dt>Transport connections</dt>
+              <dd>
+                Browser managed
+                <span class="sub-value">TCP / QUIC count not exposed</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Completed payload</dt>
+              <dd id="diag-volume">—</dd>
+            </div>
+            <div>
+              <dt>Recovery &amp; probes</dt>
+              <dd id="diag-retries">—</dd>
+            </div>
+            <div>
+              <dt>Download phase</dt>
+              <dd id="diag-down-size">—</dd>
+            </div>
+            <div>
+              <dt>Upload phase</dt>
+              <dd id="diag-up-size">—</dd>
+            </div>
+            <div>
+              <dt>Access type at test start</dt>
+              <dd id="diag-network">Not recorded</dd>
+            </div>
+            <div>
+              <dt>Tested server</dt>
+              <dd id="server">Automatic selection</dd>
+            </div>
+            <div class="full-row">
+              <dt>
+                Exact endpoint URLs
+                <button
+                  class="info-button"
+                  data-info="endpoints"
+                  aria-label="About endpoint URLs"
+                >
+                  i
+                </button>
+              </dt>
+              <dd id="diag-endpoint">Available after selecting a route</dd>
+            </div>
+          </dl>
+          <div class="export-toolbar">
+            <button id="copy-curl" class="secondary" disabled>Copy cURL</button
+            ><button id="copy-stats" class="secondary" disabled>
+              Copy Raw Stats</button
+            ><button id="export-json" class="secondary" disabled>
+              Export JSON</button
+            ><button id="export-csv" class="secondary" disabled>
+              Export CSV</button
+            ><span id="export-status" class="small" role="status"></span>
+          </div>
+        </article>
+        <article id="connection-inspector" class="panel inspector-card">
+          <div class="section-head">
+            <div>
+              <h2>Current connection</h2>
+              <p class="small">Live metadata · separate from saved flights</p>
+            </div>
+            <button
+              id="refresh-connection"
+              class="secondary"
+              aria-label="Refresh IP and ISP information"
+            >
+              Refresh ↻
+            </button>
+          </div>
+          <dl class="data-grid">
+            <div>
+              <dt>Public IP</dt>
+              <dd id="ip">Detecting…</dd>
+            </div>
+            <div>
+              <dt>Public ASN</dt>
+              <dd id="asn">—</dd>
+            </div>
+            <div>
+              <dt>Access type source</dt>
+              <dd id="network-source">Checking browser support…</dd>
+            </div>
+            <div>
+              <dt>
+                Browser performance estimate
+                <button
+                  class="info-button"
+                  data-info="network"
+                  aria-label="About network type detection"
+                >
+                  i
+                </button>
+              </dt>
+              <dd id="network-estimate">—</dd>
+            </div>
+          </dl>
+          <div class="connection-edit">
+            <label for="network-choice">Label this connection</label
+            ><select id="network-choice">
+              <option value="auto">Automatic · browser detection</option>
+              <option value="wifi">Wi-Fi</option>
+              <option value="ethernet">Ethernet</option>
+              <option value="cellular">Cellular · unknown generation</option>
+              <option value="3g">3G</option>
+              <option value="4g">4G / LTE</option>
+              <option value="5g">5G</option>
+              <option value="other">Other</option></select
+            ><button
+              class="info-button"
+              data-info="privacy"
+              aria-label="About IP and ISP privacy"
+            >
+              i
+            </button>
+          </div>
+          <p id="connection-status" class="small" role="status">
+            Identifying your public connection…
+          </p>
+        </article>
+      </section>
+
+      <section
+        id="view-history"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-history"
+        tabindex="0"
+        hidden
+      >
+        <article id="history-section" class="panel history-panel">
+          <div class="section-head">
+            <div>
+              <h2>
+                Flight history
+                <span id="history-count" class="count-badge">0</span>
+              </h2>
+              <p class="small">Your connection, over time.</p>
+            </div>
+            <button id="export" class="secondary">Export history</button>
+          </div>
+          <div class="history-tools">
+            <label class="search-field"
+              ><span aria-hidden="true">⌕</span
+              ><span class="sr-only">Search flight history</span
+              ><input
+                id="history-search"
+                type="search"
+                placeholder="Search servers or status…"
+                autocomplete="off" /></label
+            ><button
+              class="info-button"
+              data-info="history"
+              aria-label="About local flight history"
+            >
+              i
+            </button>
+          </div>
+          <div
+            class="table-wrap"
+            role="region"
+            aria-label="Saved flight results"
+            tabindex="0"
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Flight</th>
+                  <th scope="col">Route</th>
+                  <th scope="col">↓ Mbps</th>
+                  <th scope="col">↑ Mbps</th>
+                  <th scope="col">Ping / jitter</th>
+                  <th scope="col">Trace</th>
+                  <th scope="col">Status</th>
+                  <th scope="col"><span class="sr-only">Inspect</span></th>
+                </tr>
+              </thead>
+              <tbody id="history"></tbody>
+            </table>
+          </div>
+          <div id="history-empty" class="empty-history">
+            <span aria-hidden="true">◴</span>
+            <h3>Your flight recorder is ready.</h3>
+            <p>Completed, interrupted and cancelled tests appear here.</p>
+          </div>
+          <p id="storage-status" class="small storage-status" role="status">
+            Saved in this browser. Export a copy to keep your records.
+          </p>
+        </article>
+      </section>
+      <footer>
+        <span class="developer-credit"
+          ><img
+            src="higheriyer.png"
+            alt=""
+            width="28"
+            height="28"
+            loading="lazy"
+            decoding="async"
+          /><span>Developed by <strong>HigherIyer</strong></span></span
+        ><span>Orbit · Independent network measurements</span>
+      </footer>
+    </main>
+
+    <dialog id="route-dialog" aria-labelledby="routes-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">GROUND STATIONS</p>
+          <h2 id="routes-title">Choose your route</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close-dialog="route-dialog"
+          aria-label="Close route settings"
+        >
+          ✕
+        </button>
+      </div>
+      <section class="location-section">
+        <div class="section-head">
+          <div>
+            <p id="location-source" class="small">Checking your search area</p>
+            <h3 id="location-name">Locating you…</h3>
+          </div>
+          <button
+            id="change-location"
+            class="text-button"
+            aria-expanded="false"
+            aria-controls="location-editor"
+          >
+            Change location
+          </button>
+        </div>
+        <div id="location-editor" class="location-editor" hidden>
+          <label for="location-choice">Search area</label
+          ><select id="location-choice">
+            <option value="none">
+              No location filter · compare by latency
+            </option>
+          </select>
+          <div class="button-row">
+            <button id="apply-location" class="secondary">Use this area</button
+            ><button id="locate" class="secondary">Use device location</button>
+          </div>
+        </div>
+        <p id="location-status" class="small" role="status">
+          Checking device location automatically.
+        </p>
+      </section>
+      <div class="server-filters">
+        <label
+          >Network<select id="provider-filter">
+            <option value="all">All networks</option>
+            <option value="independent">
+              Independent · exclude Cloudflare
+            </option>
+            <option value="Clouvider">Clouvider</option>
+            <option value="Sharktech">Sharktech</option>
+            <option value="Community / research">Community / research</option>
+            <option value="Cloudflare">Cloudflare edge</option>
+          </select></label
+        ><label
+          >Coverage<select id="server-scope">
+            <option value="nearby">Nearby servers</option>
+            <option value="all">All reviewed servers</option>
+          </select></label
+        >
+      </div>
+      <label for="server-select">Test server</label
+      ><select id="server-select">
+        <option value="auto">Auto · lowest measured latency</option>
+      </select>
+      <div class="section-head scan-heading">
+        <span id="catalog-summary" class="small"
+          >26 reviewed endpoints + Cloudflare</span
+        ><button id="scan" class="secondary">Rescan</button>
+      </div>
+      <p id="scan-status" class="small" role="status">
+        Preparing your nearby server shortlist…
+      </p>
+      <div id="server-list" class="server-list"></div>
+      <div class="dialog-foot">
+        <button class="text-button" data-info="providers">
+          About these networks ⓘ</button
+        ><button class="secondary" data-close-dialog="route-dialog">
+          Done
+        </button>
+      </div>
+    </dialog>
+    <div
+      id="info-popover"
+      class="info-popover"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="info-title"
+      hidden
+    >
+      <div class="section-head">
+        <h3 id="info-title"></h3>
+        <button
+          id="close-info"
+          class="icon-button"
+          aria-label="Close information"
+        >
+          ✕
+        </button>
+      </div>
+      <div id="info-content"></div>
     </div>
-    <div class="results">
-      <article class="panel" id="download-card"><h2><span class="cyan">↓</span> Download</h2><div class="reading"><output id="download">—</output><span>Mbps</span></div><p id="download-detail">Sustained average</p></article>
-      <article class="panel" id="upload-card"><h2><span class="violet">↑</span> Upload</h2><div class="reading"><output id="upload">—</output><span>Mbps</span></div><p id="upload-detail">Sustained average</p></article>
-      <article class="panel" id="ping-card"><h2><span class="amber">↔</span> Idle latency</h2><div class="reading"><output id="ping">—</output><span>ms</span></div><p>Median HTTP round trip</p></article>
-    </div>
-    <div class="telemetry">
-      <section class="panel graph-panel" aria-labelledby="graph-title"><div class="section-head"><div><p class="eyebrow">TIME SERIES</p><h2 id="graph-title">Throughput trace</h2></div><span class="legend"><i class="cyan">● Down</i><i class="violet">● Up</i></span></div><svg id="speed-chart" viewBox="0 0 640 190" role="img" aria-label="Throughput samples over elapsed time"></svg><div class="graph-bottom"><span>Aggregate completed bytes / sample interval</span><span>Mbps · elapsed seconds</span></div></section>
-      <section class="panel latency-panel"><div class="section-head"><div><p class="eyebrow">IDLE STABILITY</p><h2>Latency variation</h2></div><strong id="jitter">—</strong></div><p>ms jitter · mean consecutive difference</p><svg id="ping-chart" viewBox="0 0 260 75" role="img" aria-label="Ping samples in milliseconds"></svg></section>
-    </div>
-    <section class="panel diagnostics" aria-labelledby="diagnostics-title"><div class="section-head"><div><p class="eyebrow">BEYOND BANDWIDTH</p><h2 id="diagnostics-title">Latency under load</h2></div><span id="diag-state" class="micro-label">WAITING FOR SAMPLES</span></div><div class="loaded-grid"><article><span>↓ During download</span><strong id="loaded-download">—</strong><p id="loaded-download-detail">HTTP RTT during transfer</p></article><article><span>↑ During upload</span><strong id="loaded-upload">—</strong><p id="loaded-upload-detail">HTTP RTT during transfer</p></article><article><span>Idle p95</span><strong id="diag-p95">—</strong><p>95th percentile · HTTP round trip</p></article></div><details class="technical-details"><summary>Inspect measurement details</summary><dl><div><dt>Measurement</dt><dd id="diag-mode">Select a measurement mode</dd></div><div><dt>Access type at test start</dt><dd id="diag-network">Not recorded</dd></div><div><dt>Endpoint</dt><dd id="diag-endpoint">Not measured yet</dd></div><div><dt>Completed payload</dt><dd id="diag-volume">—</dd></div><div><dt>Recovery / probes</dt><dd id="diag-retries">—</dd></div></dl><p class="small">Loaded RTT includes browser, transport and endpoint scheduling. An increase can reveal queueing; this is not an ICMP ping or a measurement of UDP packet loss. Four parallel HTTP transfers share one browser connection pool and may multiplex over one transport connection. Clouvider uploads use 1 MB requests to respect server limits; smaller requests can limit single-stream throughput on long routes.</p></details></section>
-  </section>
-  <section class="panel server-panel" aria-labelledby="servers-title">
-    <div class="section-head"><div><p class="eyebrow">GROUND STATIONS</p><h2 id="servers-title">Find your fastest route</h2></div><div class="server-actions"><button id="scan" class="secondary">Scan servers</button></div></div>
-    <div class="server-filters"><div><label for="provider-filter">Server network</label><select id="provider-filter"><option value="all">All networks</option><option value="independent">Independent servers · exclude Cloudflare</option><option value="Clouvider">Clouvider</option><option value="Sharktech">Sharktech</option><option value="Community / research">Community / research</option><option value="Cloudflare">Cloudflare edge</option></select></div><div><label for="server-scope">Search coverage</label><select id="server-scope"><option value="nearby">Nearby · up to 12 public servers</option><option value="all">All reviewed servers · wider scan</option></select></div></div>
-    <p id="catalog-summary" class="small">26 reviewed public endpoints + Cloudflare. Only reachable servers can be selected.</p>
-    <label for="server-select">Test server</label><select id="server-select"><option value="auto">Automatic · lowest measured latency</option></select>
-    <p id="scan-status" role="status">Preparing your nearby server shortlist…</p><div id="server-list" class="server-list"></div>
-    <dl class="connection"><div><dt>Tested endpoint</dt><dd id="server">Automatic selection</dd></div></dl>
-    <p class="small">Distances use approximate server city centers. Cloudflare selects its own route. Public servers can be unavailable or block browser requests. Each candidate is checked for latency, download and upload support; server capacity and routing affect the result.</p>
-    <details class="server-comparison"><summary>How do these servers compare with Speedtest and Fast.com?</summary><div class="comparison-grid"><article><h3>Orbit</h3><p>Reviewed public LibreSpeed endpoints hosted by Clouvider, Sharktech and community / research operators, plus Cloudflare’s routed edge. Select an operator and city to compare network paths. Free to use; public capacity varies.</p><a href="https://librespeed.org/" target="_blank" rel="noopener noreferrer">LibreSpeed network ↗</a> · <a href="https://as62240.net/speedtest" target="_blank" rel="noopener noreferrer">Clouvider locations ↗</a></article><article><h3>Speedtest by Ookla</h3><p>Uses the Speedtest host network. Nearby candidates are checked for latency, with manual server selection available. An ISP-hosted route may stay closer to your access network than an independent host.</p><a href="https://www.speedtest.net/" target="_blank" rel="noopener noreferrer">Open Speedtest ↗</a></article><article><h3>Fast.com</h3><p>Downloads and uploads to Netflix servers. Useful for comparing the path to Netflix’s delivery network; loaded and unloaded latency are available under Show more info.</p><a href="https://fast.com/" target="_blank" rel="noopener noreferrer">Open Fast.com ↗</a></article></div><p class="small">These are separate services, not additional Orbit endpoints. Orbit does not reuse their private clients or API tokens. Compare tests one at a time on the same device and access type: routing, server load and measurement methods can all change the result.</p></details>
-  </section>
-  <section class="quality" aria-labelledby="quality-title"><div class="section-head"><div><p class="eyebrow">MISSION READINESS</p><h2 id="quality-title">What can your connection handle?</h2></div><span id="overall" class="pill">Awaiting a test</span></div><div id="ratings" class="rating-grid"></div><p class="small">Estimates for this test route, not a guarantee. Actual game-server latency and UDP packet loss are not measured. Loaded HTTP latency is reported separately above. <a href="https://help.netflix.com/en/node/306" target="_blank" rel="noopener">Streaming guidance</a> · <a href="https://www.nvidia.com/en-gb/geforce-now/system-reqs/" target="_blank" rel="noopener">Cloud gaming requirements</a></p></section>
-  <section id="history-section" class="panel history-panel"><div class="section-head"><div><p class="eyebrow">FLIGHT RECORDER</p><h2>Test history</h2></div><button id="export" class="secondary">Export history</button></div><p id="storage-status" class="small">Tests are saved in this browser, including failed and cancelled attempts. Earlier unsaved tests cannot be recovered.</p><div class="table-wrap"><table><thead><tr><th>When</th><th>Server</th><th>Download</th><th>Upload</th><th>Ping / jitter</th><th>Status</th><th>Details</th></tr></thead><tbody id="history"></tbody></table></div><p id="history-empty">No flights recorded yet. Your next test starts the log.</p></section>
-  <footer><span class="developer-credit"><span class="developer-mark" aria-hidden="true"><img src="higheriyer.png" alt="" width="84" height="84" loading="lazy" decoding="async"></span><span>Developed by <strong>HigherIyer</strong></span></span><span>22-second sustained transfers · Saved on this device</span></footer>
-</main>
-<dialog id="install-dialog" aria-labelledby="install-title" aria-describedby="install-description">
-  <div class="section-head"><div class="install-identity"><img src="icon-192.png" alt="" width="48" height="48"><h2 id="install-title">Orbit, ready to launch.</h2></div><button id="close-install" class="secondary" type="button" aria-label="Close install instructions">✕</button></div>
-  <p id="install-description">Add Orbit to your app launcher and open it in its own window.</p>
-  <div class="app-maintenance"><span id="app-mode" class="micro-label">Browser tab</span><button id="check-app-update" class="secondary" type="button">Check for updates</button></div>
-  <p id="install-status" class="small" role="status">Preparing offline access…</p>
-  <p id="install-feedback" class="small" role="status" hidden></p>
-  <details id="install-help" open><summary>Installation &amp; icon help</summary><ul class="install-steps"><li><strong>Chrome / Edge on a computer</strong><span>Open this site in your regular browser. Choose its address-bar install icon, or find “Install page as app” / “Install this site as an app” in the browser menu.</span></li><li><strong>Android</strong><span>Use Chrome’s menu → Add to home screen → Install.</span></li><li><strong>iPhone / iPad</strong><span>Open in Safari → Share → Add to Home Screen. Keep “Open as Web App” enabled if shown.</span></li><li><strong>Mac with Safari</strong><span>On macOS Sonoma 14 or later, choose File → Add to Dock.</span></li></ul><p class="small">Missing an icon after installing with a Flatpak browser on Linux? Its desktop launcher may point to a sandbox path that does not exist on the host. The browser’s exported icon and launcher path need to agree.</p></details>
-  <p class="small">Embedded browsers and some desktop browsers do not offer app installation. If no install option appears, use a regular Chrome or Edge window.</p>
-  <p class="small">History stays in this browser’s storage. Safari app installs and other profiles may have separate history; export important flights before switching. Offline mode opens recorded flights; fresh speed tests, ISP details and server searches need internet.</p>
-</dialog>
-</body>
+    <dialog id="copy-dialog" aria-labelledby="copy-title">
+      <div class="section-head">
+        <h2 id="copy-title">Copy to clipboard</h2>
+        <button
+          class="icon-button"
+          data-close-dialog="copy-dialog"
+          aria-label="Close copy dialog"
+        >
+          ✕
+        </button>
+      </div>
+      <p class="small">
+        Clipboard access is unavailable here. Select and copy the text below.
+      </p>
+      <textarea
+        id="copy-output"
+        readonly
+        aria-label="Text to copy"
+        rows="12"
+        spellcheck="false"
+      ></textarea>
+    </dialog>
+    <dialog
+      id="install-dialog"
+      aria-labelledby="install-title"
+      aria-describedby="install-description"
+    >
+      <div class="section-head">
+        <div class="install-identity">
+          <img src="icon-192.png" alt="" width="48" height="48" />
+          <h2 id="install-title">Orbit, ready to launch.</h2>
+        </div>
+        <button
+          id="close-install"
+          class="secondary"
+          type="button"
+          aria-label="Close install instructions"
+        >
+          ✕
+        </button>
+      </div>
+      <p id="install-description">
+        Add Orbit to your app launcher and open it in its own window.
+      </p>
+      <div class="app-maintenance">
+        <span id="app-mode" class="micro-label">Browser tab</span
+        ><button id="check-app-update" class="secondary" type="button">
+          Check for updates
+        </button>
+      </div>
+      <p id="install-status" class="small" role="status">
+        Preparing offline access…
+      </p>
+      <p id="install-feedback" class="small" role="status" hidden></p>
+      <details id="install-help" open>
+        <summary>Installation &amp; icon help</summary>
+        <ul class="install-steps">
+          <li>
+            <strong>Chrome / Edge on a computer</strong
+            ><span
+              >Open this site in your regular browser. Choose its address-bar
+              install icon, or find “Install page as app” / “Install this site
+              as an app” in the browser menu.</span
+            >
+          </li>
+          <li>
+            <strong>Android</strong
+            ><span>Use Chrome’s menu → Add to home screen → Install.</span>
+          </li>
+          <li>
+            <strong>iPhone / iPad</strong
+            ><span
+              >Open in Safari → Share → Add to Home Screen. Keep “Open as Web
+              App” enabled if shown.</span
+            >
+          </li>
+          <li>
+            <strong>Mac with Safari</strong
+            ><span
+              >On macOS Sonoma 14 or later, choose File → Add to Dock.</span
+            >
+          </li>
+        </ul>
+        <p class="small">
+          Missing an icon after installing with a Flatpak browser on Linux? Its
+          desktop launcher may point to a sandbox path that does not exist on
+          the host. The browser’s exported icon and launcher path need to agree.
+        </p>
+      </details>
+      <p class="small">
+        Embedded browsers and some desktop browsers do not offer app
+        installation. If no install option appears, use a regular Chrome or Edge
+        window.
+      </p>
+      <p class="small">
+        History stays in this browser’s storage. Safari app installs and other
+        profiles may have separate history; export important flights before
+        switching. Offline mode opens recorded flights; fresh speed tests, ISP
+        details and server searches need internet.
+      </p>
+    </dialog>
+  </body>
 </html>

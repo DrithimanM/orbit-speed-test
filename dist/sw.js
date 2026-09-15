@@ -1,7 +1,7 @@
 // Update this fingerprint with npm run cache:version after changing app assets.
-const CACHE_VERSION = '58377b3a2503ab1070da';
+const CACHE_VERSION = '442e70b39808e08af971';
 const SHELL_FILES = [
-  "index.html", "styles.css", "security.js", "core.js", "app.js", "pwa.js",
+  "index.html", "styles.css", "security.js", "core.js", "telemetry.js", "ui.js", "app.js", "pwa.js",
   "servers.json", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png",
   "rocket.png", "higheriyer.png", "favicon-48.png", "apple-touch-icon.png"
 ];

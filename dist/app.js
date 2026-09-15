@@ -26,14 +26,14 @@ function setBusy() {
   $('network-choice').disabled=Boolean(controller);
   $('refresh-connection').disabled=offline || Boolean(controller || metadataController);
   $('cancel').hidden = !controller;
-  $('start-label').textContent = controller ? 'TEST IN FLIGHT' : locating ? 'LOCATING…' : scanning ? 'FINDING ROUTE…' : offline ? 'OFFLINE' : 'START TEST';
-  $('start').setAttribute('aria-label',controller ? 'Speed test in progress' : locating || scanning ? 'Preparing the test route' : offline ? 'Reconnect to run a speed test' : 'Start speed test');
+  $('start-label').textContent = controller ? 'Test in flight' : locating ? 'Locating…' : scanning ? 'Finding route…' : offline ? 'Offline' : 'Launch Test';
+  $('start').setAttribute('aria-label',controller ? 'Speed test in progress' : locating || scanning ? 'Preparing the test route' : offline ? 'Reconnect to run a speed test' : 'Launch speed test');
   document.body.classList.toggle('running', Boolean(controller));
   document.body.classList.toggle('preparing', locating || scanning);
 }
 function updateDial(value=0,unit='Mbps') {
   const fraction=SpeedCore.dialFraction(value);
-  $('dial-needle').setAttribute('transform',`translate(${fraction*296} 0)`);
+  $('dial-needle').setAttribute('transform',`rotate(${-135+fraction*270} 180 171)`);
   document.body.setAttribute('data-speed-tier',value>300?'high':value>50?'medium':'low');
   $('dial-fill').setAttribute('stroke-dashoffset',String(100-fraction*100));
   $('dial-scale').textContent=`0–1,000 ${unit}${value>1000?' · above dial range':''}`;
@@ -223,6 +223,7 @@ async function discoverServers() {
   $('scan-status').textContent = 'Loading the public server catalog…';
   try {
     const snapshot = (await request('servers.json',{},undefined,5000,true)).body;
+    OrbitUI.setCatalog(snapshot);
     let catalog = Array.isArray(snapshot.servers) ? snapshot.servers : [];
     let catalogLabel = `bundled catalog (${snapshot.updated})`;
     try {
@@ -269,6 +270,7 @@ function renderServers() {
     button.addEventListener('click',()=>{if(controller || scanning) return;selectedId=server.id;renderServers();});list.append(button);
   }
   select.value=selectedId;
+  OrbitUI.updateRoute(servers,selectedId);
 }
 
 // Graphs are SVG data plots, generated from measured samples, never random decoration.
@@ -278,26 +280,7 @@ function svgElement(tag, attrs, text) {
   if(text!==undefined) el.textContent=text;
   return el;
 }
-function drawSpeed(record) {
-  const svg=$('speed-chart');svg.replaceChildren();
-  const series=[record?.download?.points || [],record?.upload?.points || []];
-  const maxY=Math.max(10,...series.flat().map(p=>p.mbps))*1.12;
-  const maxX=Math.max(22,...series.flat().map(p=>p.seconds));
-  for(let i=0;i<=4;i++) {
-    const y=12+i*38;
-    svg.append(svgElement('line',{x1:43,y1:y,x2:628,y2:y,stroke:'#28364d','stroke-width':1}));
-    svg.append(svgElement('text',{x:36,y:y+4,fill:'#9baac4','font-size':10,'text-anchor':'end'},Math.round(maxY*(1-i/4))));
-    svg.append(svgElement('text',{x:43+i*146,y:185,fill:'#9baac4','font-size':10,'text-anchor':'middle'},`${Math.round(maxX*i/4)}s`));
-  }
-  series.forEach((points,index)=>{
-    if(!points.length)return;
-    const coords=points.map(p=>`${43+p.seconds/maxX*585},${164-p.mbps/maxY*152}`).join(' ');
-    const color=index ? '#ae9bff' : '#79f6dc';
-    svg.append(svgElement('polyline',{points:coords,fill:'none',stroke:color,'stroke-width':2.5,'stroke-linejoin':'round'}));
-    const last=points.at(-1);svg.append(svgElement('circle',{cx:43+last.seconds/maxX*585,cy:164-last.mbps/maxY*152,r:3,fill:color}));
-  });
-  if(!series.flat().length)svg.append(svgElement('text',{x:335,y:92,fill:'#9baac4','font-size':13,'text-anchor':'middle'},'Your throughput trace will appear here'));
-}
+function drawSpeed(record) { OrbitUI.drawThroughput(record); }
 function drawPings(values=[]) {
   const svg=$('ping-chart');svg.replaceChildren();
   if(!values.length){svg.append(svgElement('text',{x:130,y:42,fill:'#9baac4','font-size':12,'text-anchor':'middle'},'Waiting for latency samples'));return;}
@@ -307,15 +290,7 @@ function drawPings(values=[]) {
   values.forEach((value,index)=>svg.append(svgElement('circle',{cx:12+index/Math.max(1,values.length-1)*236,cy:60-value/max*50,r:3,fill:'#ffca83'})));
   svg.append(svgElement('text',{x:248,y:74,fill:'#9baac4','font-size':9,'text-anchor':'end'},`${Math.min(...values).toFixed(0)}–${Math.max(...values).toFixed(0)} ms`));
 }
-function showRatings(result) {
-  const ratings=result?.status==='complete' ? SpeedCore.ratings(result) : ['Online gaming','Video streaming','Cloud gaming','Video calls'].map(name=>({name,grade:'Awaiting test',detail:'Complete a test to estimate connection quality.'}));
-  $('ratings').replaceChildren();
-  for(const rating of ratings) {
-    const card=node('article',undefined,'panel rating-card');
-    card.append(node('h3',rating.name),node('strong',rating.grade,rating.grade==='Limited' ? 'limited' : ''),node('p',rating.detail));$('ratings').append(card);
-  }
-  $('overall').textContent=result?.status==='complete' ? (result.downloadMbps>=25 && result.uploadMbps>=5 && result.pingMs<80 && result.jitterMs<20 ? 'Strong connection' : 'See your ratings') : 'Awaiting a test';
-}
+function showRatings(record) { OrbitUI.renderRatings(record); }
 
 function delay(ms,signal) {
   return new Promise(resolve=>{
@@ -339,6 +314,7 @@ function showDiagnostics(record) {
   const retries=(record?.download?.retries || 0)+(record?.upload?.retries || 0);
   $('diag-volume').textContent=record ? `${(total/1000000).toFixed(1)} MB · ${record.measurementVersion===2 ? requests+' requests' : 'legacy record'}` : '—';
   $('diag-retries').textContent=record?.measurementVersion===2 ? `${retries} transfer retries · ${(record.download?.probeFailures || 0)+(record.upload?.probeFailures || 0)} missed RTT probes` : record ? 'Not recorded in legacy tests' : '—';
+  OrbitUI.renderTelemetry(record);
 }
 function reservePayload(run,bytes) {
   if(run.reserved+bytes>8000000000){const error=new Error('The 8 GB safety budget was reached. Use single-stream mode or test again.');error.code='LIMIT';throw error;}
@@ -513,6 +489,10 @@ async function loadHistory() {
     historyRecords=[...new Map([...valid,...previous.filter(OrbitSecurity.validRecord)].map(record=>[record.id,record])).values()];
   } catch {$('storage-status').textContent='Browser storage is unavailable. This session’s history will not survive a reload; export it to keep a copy.';}
   renderHistory();
+  if(!current && !controller){
+    const last=historyRecords.filter(record=>record.status==='complete').sort((a,b)=>b.date.localeCompare(a.date))[0];
+    if(last)viewRecord(last);
+  }
 }
 async function saveRecord(record) {
   const index=historyRecords.findIndex(item=>item.id===record.id);
@@ -523,30 +503,23 @@ async function saveRecord(record) {
   } catch {$('storage-status').textContent='This result could not be saved. Browser storage may be full or blocked. Export history before leaving.';}
   renderHistory();
 }
-function renderHistory() {
-  const tbody=$('history');tbody.replaceChildren();
-  $('history-empty').hidden=historyRecords.length>0;
-  for(const record of [...historyRecords].sort((a,b)=>b.date.localeCompare(a.date))) {
-    const tr=node('tr');
-    const completed=record.status==='complete';
-    for(const text of [new Date(record.date).toLocaleString(),record.server,completed ? `${format(record.downloadMbps)} Mbps`:'—',completed ? `${format(record.uploadMbps)} Mbps`:'—',completed ? `${format(record.pingMs)} / ${format(record.jitterMs)} ms`:'—',record.status==='running' ? 'Unfinished / in another tab' : record.status])tr.append(node('td',text));
-    const td=node('td');const button=node('button','View','secondary');button.type='button';
-    button.addEventListener('click',()=>{
-      if(controller){status('Finish or cancel the current test before viewing history.');return;}
-      current=record;drawSpeed(record);drawPings(record.pings);showRatings(record);showDiagnostics(record);$('diag-endpoint').textContent=record.server;$('route-note').textContent='Saved measurement · '+record.server;
-      for(const [id,key] of [['download','downloadMbps'],['upload','uploadMbps'],['ping','pingMs'],['jitter','jitterMs']])$(id).textContent=completed ? format(record[key]):'—';
-      for(const direction of ['download','upload'])$(`${direction}-detail`).textContent=completed ? `${(record[direction].durationMs/1000).toFixed(1)} s · ${(record[direction].bytes/1000000).toFixed(0)} MB`:'Incomplete · partial trace';
-      $('server').textContent=record.server;$('live-value').textContent=completed ? format(record.downloadMbps):'—';$('live-unit').textContent='Mbps';$('flight-time').textContent='HISTORY';
-      updateDial(completed ? record.downloadMbps : 0);phase(null,'RECORDED FLIGHT');status(`Viewing ${new Date(record.date).toLocaleString()} · ${record.status}${record.error ? ' · '+record.error:''}`);
-      $('progress').value=completed ? 100:0;
-      document.querySelector('.dashboard').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
-    });td.append(button);tr.append(td);tbody.append(tr);
-  }
+function renderHistory() { OrbitUI.renderHistory(historyRecords); }
+function viewRecord(record) {
+  if(controller){status('Finish or cancel the current test before viewing another flight.');return false;}
+  const completed=record.status==='complete';
+  current=record;drawSpeed(record);drawPings(record.pings);showRatings(record);showDiagnostics(record);
+  $('route-note').textContent='Saved measurement · '+record.server;
+  for(const [id,key] of [['download','downloadMbps'],['upload','uploadMbps'],['ping','pingMs'],['jitter','jitterMs']])$(id).textContent=completed ? format(record[key]):'—';
+  for(const direction of ['download','upload'])$(`${direction}-detail`).textContent=completed ? `${(record[direction].durationMs/1000).toFixed(1)} s · ${(record[direction].bytes/1000000).toFixed(0)} MB`:'Incomplete · partial trace';
+  $('server').textContent=record.server;$('live-value').textContent=completed ? format(record.downloadMbps):'—';$('live-unit').textContent='Mbps';$('flight-time').textContent='SAVED FLIGHT';
+  updateDial(completed ? record.downloadMbps : 0);phase(null,'RECORDED FLIGHT');
+  $('live-label').textContent=completed ? 'Download · sustained average' : 'Incomplete measurement';
+  status(`Viewing ${new Date(record.date).toLocaleString()} · ${record.status}${record.error ? ' · '+record.error:''}`);
+  $('progress').value=completed ? 100:0;
+  document.body.classList.toggle('error',record.status==='failed');
+  return true;
 }
-$('export').addEventListener('click',()=>{
-  const url=URL.createObjectURL(new Blob([JSON.stringify(historyRecords,null,2)],{type:'application/json'}));
-  const link=node('a');link.href=url;link.download=`orbit-history-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-});
+// Interface event wiring.
 $('server-select').addEventListener('change',event=>{selectedId=event.target.value;renderServers();});
 $('start').addEventListener('click',startTest);
 $('cancel').addEventListener('click',()=>controller?.abort());
@@ -567,6 +540,7 @@ $('apply-location').addEventListener('click',applyLocation);
 if(EMBEDDED){
   document.body.replaceChildren(node('p','Open Orbit directly in its own tab to use network tests.'));
 }else{
+OrbitUI.init({getHistory:()=>historyRecords,selectRecord:viewRecord,getCatalog:async()=>(await request('servers.json',{},undefined,5000,true)).body});
 drawSpeed();drawPings();showRatings();showDiagnostics();updateDial();
 loadHistory();
 showNetwork();setBusy();
