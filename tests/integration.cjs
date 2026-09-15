@@ -1,6 +1,6 @@
 const vm=require('node:vm');const fs=require('node:fs');const assert=require('node:assert/strict');
 const core=fs.readFileSync('dist/core.js','utf8');
-const source=fs.readFileSync('dist/app.js','utf8').split("$('export').addEventListener")[0];
+const source=fs.readFileSync('dist/app.js','utf8').split('// Interface event wiring.')[0];
 const stored=new Map();
 function setup(mode='good',geo='denied') {
   let tick=0;const elements=new Map();const urls=[];let geoCallbacks;
@@ -10,7 +10,7 @@ function setup(mode='good',geo='denied') {
   }
   const el=id=>{if(!elements.has(id))elements.set(id,new Element(id));return elements.get(id);};
   const db={transaction(){const tx={objectStore(){return {put(record){stored.set(record.id,structuredClone(record));queueMicrotask(()=>tx.oncomplete?.());},getAll(){const req={};queueMicrotask(()=>{req.result=[...stored.values()].map(v=>structuredClone(v));req.onsuccess?.();});return req;}};}};return tx;}};
-  const context=vm.createContext({console,URL,URLSearchParams,TextDecoder,OrbitSecurity:require('../dist/security.js'),Option:class extends Element {constructor(text,value){super('option');this.textContent=text;this.value=value;}},document:{baseURI:'http://localhost:8000/',getElementById:el,createElement:t=>new Element(t),createElementNS:(_,t)=>new Element(t),body:el('body'),querySelector:()=>el('dashboard')},navigator:{geolocation:geo==='unsupported'?undefined:{getCurrentPosition:(resolve,reject)=>{geoCallbacks={resolve,reject};if(geo==='granted')resolve({coords:{latitude:25.2,longitude:55.27}});else if(geo==='invalid')resolve({coords:{latitude:Infinity,longitude:55}});else if(geo==='denied')reject({code:1});}}},Intl:{DateTimeFormat:()=>({resolvedOptions:()=>({timeZone:'Asia/Dubai'})})},indexedDB:{open(){const req={};queueMicrotask(()=>{if(mode==='storage'){req.error=new Error('quota');req.onerror?.();}else{req.result=db;req.onsuccess?.();}});return req;}},performance:{now:()=>tick},crypto:require('node:crypto').webcrypto,AbortController,AbortSignal,setInterval:()=>1,clearInterval(){},setTimeout:(fn,ms)=>setTimeout(fn,geo==='timeout'?1:ms),clearTimeout,Blob,matchMedia:()=>({matches:true}),fetch:async(url,options)=>{
+  const context=vm.createContext({console,URL,URLSearchParams,TextDecoder,OrbitUI:{updateRoute(){},setCatalog(){},drawThroughput(){},renderRatings(){},renderTelemetry(){},renderHistory(){}},OrbitSecurity:require('../dist/security.js'),Option:class extends Element {constructor(text,value){super('option');this.textContent=text;this.value=value;}},document:{baseURI:'http://localhost:8000/',getElementById:el,createElement:t=>new Element(t),createElementNS:(_,t)=>new Element(t),body:el('body'),querySelector:()=>el('dashboard')},navigator:{geolocation:geo==='unsupported'?undefined:{getCurrentPosition:(resolve,reject)=>{geoCallbacks={resolve,reject};if(geo==='granted')resolve({coords:{latitude:25.2,longitude:55.27}});else if(geo==='invalid')resolve({coords:{latitude:Infinity,longitude:55}});else if(geo==='denied')reject({code:1});}}},Intl:{DateTimeFormat:()=>({resolvedOptions:()=>({timeZone:'Asia/Dubai'})})},indexedDB:{open(){const req={};queueMicrotask(()=>{if(mode==='storage'){req.error=new Error('quota');req.onerror?.();}else{req.result=db;req.onsuccess?.();}});return req;}},performance:{now:()=>tick},crypto:require('node:crypto').webcrypto,AbortController,AbortSignal,setInterval:()=>1,clearInterval(){},setTimeout:(fn,ms)=>setTimeout(fn,geo==='timeout'?1:ms),clearTimeout,Blob,matchMedia:()=>({matches:true}),fetch:async(url,options)=>{
     urls.push(String(url)); tick+=200;
     if(String(url).includes('speed.cloudflare.com/__down') && Number(new URL(url).searchParams.get('bytes'))>10000000)throw new TypeError('CORS after HTTP 403');
     if(String(url).includes('.clouvider.net/') && options.method==='POST' && options.body.byteLength>1000000)throw new Error('HTTP 413: Request Entity Too Large');
@@ -65,8 +65,8 @@ function setup(mode='good',geo='denied') {
   pendingGeo.el('location-choice').value='none';await geoRun(pendingGeo,'applyLocation()');
   assert.equal(geoRun(pendingGeo,'locationPoint'),null);assert.ok(geoRun(pendingGeo,"servers.filter(s=>s.type==='librespeed').every(s=>s.distance===null)"));
   pendingGeo.el('location-choice').value='999';await geoRun(pendingGeo,'applyLocation()');assert.equal(geoRun(pendingGeo,'locationPoint'),null);
-  run('updateDial(500)');assert.equal(app.el('dial-needle').attrs.transform,'translate(148 0)');
-  run('updateDial(2500)');assert.equal(app.el('dial-needle').attrs.transform,'translate(296 0)');assert.match(app.el('dial-scale').textContent,/above dial range/);
+  run('updateDial(500)');assert.equal(app.el('dial-needle').attrs.transform,'rotate(0 180 171)');
+  run('updateDial(2500)');assert.equal(app.el('dial-needle').attrs.transform,'rotate(135 180 171)');assert.match(app.el('dial-scale').textContent,/above dial range/);
   run("updateDial(250,'ms')");assert.match(app.el('dial-scale').textContent,/ms/);
   // Interface technology is never inferred from throughput or effectiveType.
   assert.equal(run("SpeedCore.networkSnapshot({effectiveType:'4g'},'auto',true).type"),'unknown');
