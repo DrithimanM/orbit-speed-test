@@ -117,6 +117,62 @@ const assert = require("node:assert/strict");
     () => document.querySelector("#history-count").textContent === "3",
   );
   assert.equal(await page.locator("#download").innerText(), "486.4");
+  assert.equal(await page.locator(".readiness-evidence").count(), 4);
+  assert.deepEqual(
+    await page.locator(".readiness-chip small").allTextContents(),
+    ["Responsive", "4K streaming", "1440p · responsive", "1080p calls"],
+  );
+  assert.equal(
+    await page.locator('.readiness-chip[data-level="good"]').count(),
+    4,
+  );
+  await page.locator(".readiness-chip").first().click();
+  assert.match(await page.locator("#info-popover").innerText(), /below 40 ms/);
+  await page.keyboard.press("Escape");
+  // Re-render from measurements only: neither a new test nor a history migration is needed.
+  const distant = { ...record, pingMs: 160.3, jitterMs: 12.6 };
+  await page.evaluate((r) => OrbitUI.renderRatings(r), distant);
+  assert.deepEqual(
+    await page.locator(".readiness-chip small").allTextContents(),
+    [
+      "High latency",
+      "4K streaming",
+      "High input delay",
+      "1080p calls · some delay",
+    ],
+  );
+  assert.match(
+    await page.locator(".readiness-evidence").first().innerText(),
+    /160 ms RTT/,
+  );
+  await page.setViewportSize({ width: 320, height: 950 });
+  assert.ok(
+    await page.evaluate(() =>
+      [...document.querySelectorAll(".readiness-chip")].every(
+        (e) => e.scrollWidth <= e.clientWidth,
+      ),
+    ),
+    "readiness cards must not clip at 320px",
+  );
+  await page.screenshot({
+    path: output + "/orbit-readiness-distant-320.png",
+    fullPage: true,
+  });
+  await page.evaluate((r) => OrbitUI.renderRatings(r), {
+    ...record,
+    status: "failed",
+  });
+  assert.equal(
+    await page.locator('.readiness-chip[data-level="neutral"]').count(),
+    4,
+  );
+  assert.ok(
+    (await page.locator(".readiness-chip small").allTextContents()).every(
+      (text) => text === "Awaiting test",
+    ),
+  );
+  await page.evaluate((r) => OrbitUI.renderRatings(r), record);
+  await page.setViewportSize({ width: 1440, height: 1100 });
   await page.screenshot({
     path: output + "/orbit-complete-desktop.png",
     fullPage: true,

@@ -20,13 +20,112 @@ const SpeedCore = (() => {
     return 6371 * 2 * Math.asin(Math.sqrt(Math.min(1, h)));
   }
   function ratings(result) {
+    const names = ['Online gaming', 'Video streaming', 'Cloud gaming', 'Video calls'];
+    const metrics = ['downloadMbps', 'uploadMbps', 'pingMs', 'jitterMs'];
+    const complete = result && (!result.status || result.status === 'complete');
+    if (!complete || !metrics.every(key => Number.isFinite(result[key]) && result[key] >= 0)) {
+      return names.map(name => ({
+        name, grade: complete ? 'Measurements missing' : 'Awaiting test', level: 'neutral',
+        evidence: 'A complete test is needed',
+        detail: 'Readiness needs valid download, upload, idle RTT and jitter measurements from a completed flight.',
+        advice: 'Complete a flight to estimate suitability on this route.'
+      }));
+    }
     const {downloadMbps: d, uploadMbps: u, pingMs: p, jitterMs: j} = result;
-    return [
-      {name:'Online gaming', grade:p<40 && j<10 && d>=10 && u>=3 ? 'Excellent' : p<80 && j<20 && d>=5 && u>=1 ? 'Good' : 'Limited', detail:`${p.toFixed(0)} ms ping · ${j.toFixed(1)} ms jitter. Lower is better.`},
-      {name:'Video streaming', grade:d>=15 ? '4K ready' : d>=5 ? '1080p ready' : d>=3 ? '720p ready' : 'Limited', detail:d>=15 ? `Bandwidth for approximately ${Math.max(1,Math.floor(d/15))} 4K streams at 15 Mbps each, before sharing and overhead.` : 'A stable 15 Mbps supports one Netflix 4K stream.'},
-      {name:'Cloud gaming', grade:d>=25 && p<40 && j<10 ? 'Promising' : d>=15 && p<80 && j<20 ? 'Fair' : 'Limited', detail:'1080p needs about 25 Mbps. Latency to the actual gaming service can differ.'},
-      {name:'Video calls', grade:d>=10 && u>=5 && p<100 && j<20 ? 'Excellent' : d>=3 && u>=3 && p<150 && j<30 ? 'Good' : 'Limited', detail:`${u.toFixed(1)} Mbps upload available. Ratings are practical estimates for one call.`},
-    ];
+    const number = value => value.toFixed(value < 10 ? 1 : 0);
+    const timing = `${number(p)} ms RTT · ${number(j)} ms jitter`;
+    // A lone loaded probe is not enough to label a connection as unstable.
+    const loads = ['download', 'upload'].flatMap(direction => {
+      const samples = result[direction]?.loadedPings;
+      const valid = Array.isArray(samples) ? samples.filter(n => Number.isFinite(n) && n >= 0) : [];
+      return valid.length >= 3 ? [{direction, delta: median(valid) - p, count: valid.length}] : [];
+    });
+    const load = loads.sort((a, b) => b.delta - a.delta)[0];
+    const congested = load?.delta >= 80;
+    const loadDetail = congested
+      ? ` Loaded RTT rose by ${number(load.delta)} ms during ${load.direction} (median of ${load.count} probes). Competing transfers may cause lag.`
+      : '';
+    const timingAdvice = 'Compare a lower-latency endpoint and the service you actually use; a distant test route can overstate delay.';
+    const congestionAdvice = 'Pause competing transfers, then compare again. If the rise repeats, router queue management may help.';
+    const make = (index, grade, level, evidence, detail, advice) => ({name: names[index], grade, level, evidence, detail, advice});
+
+    let gaming;
+    if (d < 5 || u < 1) {
+      gaming = make(0, 'Bandwidth constrained', 'poor', `${number(d)} ↓ / ${number(u)} ↑ Mbps`,
+        `This route falls below Orbit’s 5 Mbps down / 1 Mbps up gameplay allowance. ${timing}.${loadDetail}`,
+        'Pause other traffic or lower background download use. Individual games can need less bandwidth.');
+    } else if (p >= 150) {
+      gaming = make(0, 'High latency', 'poor', timing,
+        `Bandwidth is sufficient, but ${number(p)} ms idle HTTP RTT suggests noticeable input delay on this route.${loadDetail}`, timingAdvice);
+    } else if (j >= 30) {
+      gaming = make(0, 'Unstable timing', 'poor', timing,
+        `Bandwidth is sufficient, but ${number(j)} ms jitter suggests uneven response times.${loadDetail}`,
+        'Try Ethernet or a stronger Wi-Fi signal, pause other traffic, and compare endpoints.');
+    } else if (congested) {
+      gaming = make(0, 'Lag under load', 'fair', `+${number(load.delta)} ms during ${load.direction}`,
+        `Idle timing: ${timing}.${loadDetail}`, congestionAdvice);
+    } else {
+      const grade = p >= 80 ? 'Noticeable delay' : j >= 15 ? 'Variable timing' : p < 40 && j < 10 ? 'Responsive' : 'Playable';
+      gaming = make(0, grade, p >= 80 || j >= 15 ? 'fair' : 'good', timing,
+        `There is enough bandwidth for typical online gameplay. Orbit’s most responsive tier uses idle RTT below 40 ms and jitter below 10 ms.`,
+        p >= 80 || j >= 15 ? timingAdvice : 'Good measured timing for this route; competitive play still depends on the game server.');
+    }
+
+    const resolution = d >= 15 ? '4K' : d >= 5 ? '1080p' : d >= 3 ? '720p' : null;
+    const streaming = make(1, resolution ? `${resolution} streaming` : d >= 1 ? 'Lower-resolution video' : 'Buffering likely',
+      resolution ? 'good' : d >= 1 ? 'fair' : 'poor',
+      `${number(d)} Mbps down${d >= 15 ? ` · ≈${Math.floor(d / 15)} × 4K` : ''}`,
+      `Netflix recommends stable download rates of 3 Mbps for 720p, 5 Mbps for 1080p and 15 Mbps for 4K. This is a bandwidth estimate; any stream count excludes overhead and other traffic.`,
+      resolution ? 'Leave headroom for other devices. High idle RTT alone does not rule out buffered video.' : 'Use a lower video quality or allow more buffering; actual bitrates vary by service.');
+
+    const cloudResolution = d >= 35 ? '1440p' : d >= 25 ? '1080p' : '720p';
+    const cloudEvidence = `${cloudResolution} bandwidth · ${number(p)} ms RTT`;
+    let cloud;
+    if (d < 15) {
+      cloud = make(2, 'More bandwidth needed', 'poor', `${number(d)} Mbps down · 15+ recommended`,
+        `This result is below GeForce NOW’s 15 Mbps entry-level bandwidth guidance. ${timing}.${loadDetail}`,
+        'Try a lower-resolution service or compare another endpoint before starting cloud play.');
+    } else if (p >= 80) {
+      cloud = make(2, 'High input delay', 'poor', cloudEvidence,
+        `Bandwidth supports a ${cloudResolution} tier, but ${number(p)} ms HTTP RTT is above the 80 ms reference ceiling. NVIDIA’s requirement applies to its own data centers, which this test does not measure.${loadDetail}`, timingAdvice);
+    } else if (j >= 20) {
+      cloud = make(2, 'Uneven response', 'fair', `${cloudResolution} bandwidth · ${number(j)} ms jitter`,
+        `There is enough download bandwidth, but variable timing may disrupt interactive video.${loadDetail}`,
+        'Try Ethernet or improve Wi-Fi reception, then compare timing to your gaming service.');
+    } else if (congested) {
+      cloud = make(2, 'Lag under load', 'fair', `${cloudResolution} · +${number(load.delta)} ms loaded`,
+        `Bandwidth supports ${cloudResolution}; idle timing is ${timing}.${loadDetail}`, congestionAdvice);
+    } else {
+      const responsive = p < 40 && j < 10;
+      cloud = make(2, `${cloudResolution} · ${responsive ? 'responsive' : 'some lag'}`, responsive ? 'good' : 'fair', timing,
+        'Browser cloud-gaming bandwidth tiers follow GeForce NOW: 15 Mbps for 720p, 25 for 1080p and 35 for 1440p. Lower RTT and jitter improve interactive response.',
+        'Confirm with the service’s own network test; its route and session performance can differ.');
+    }
+
+    const callTier = d >= 3 && u >= 3.8 ? '1080p calls'
+      : d >= 1.8 && u >= 2.6 ? '720p group calls'
+      : d >= 1.2 && u >= 1.2 ? '720p one-to-one'
+      : d >= 0.6 && u >= 1 ? 'Basic video calls' : null;
+    const callEvidence = `${number(u)} Mbps up · ${number(p)} ms RTT`;
+    const callDetail = `Measured ${number(d)} Mbps down / ${number(u)} Mbps up, with ${number(p)} ms HTTP RTT and ${number(j)} ms jitter. Bandwidth tiers follow Zoom guidance for one call; timing warnings are Orbit heuristics.${loadDetail}`;
+    let calls;
+    if (d < 0.1 || u < 0.1) {
+      calls = make(3, 'Call dropouts likely', 'poor', `${number(d)} ↓ / ${number(u)} ↑ Mbps`, callDetail,
+        'Even audio has little bandwidth headroom. Pause other traffic and retry.');
+    } else if (!callTier) {
+      calls = make(3, 'Audio-first calls', 'fair', `${number(d)} ↓ / ${number(u)} ↑ Mbps`,
+        callDetail + ` Video bandwidth is constrained; ${timing}.`,
+        'Turn off video to conserve bandwidth. High delay or jitter can still affect audio.');
+    } else {
+      const issue = p >= 300 ? 'high delay' : j >= 40 ? 'choppy timing' : congested ? 'lag under load' : p >= 150 || j >= 20 ? 'some delay' : '';
+      calls = make(3, issue ? `${callTier} · ${issue}` : callTier,
+        p >= 300 || j >= 40 ? 'poor' : issue || callTier === 'Basic video calls' ? 'fair' : 'good',
+        issue === 'lag under load' ? `${number(u)} Mbps up · +${number(load.delta)} ms loaded`
+          : issue === 'choppy timing' || (j >= 20 && p < 150) ? `${number(u)} Mbps up · ${number(j)} ms jitter` : callEvidence,
+        callDetail + ` ${callTier} have enough bandwidth; ${issue || 'idle timing is favorable'} on this test route.`,
+        congested ? congestionAdvice : issue ? 'Allow for conversational delay; compare the calling app’s own statistics and another endpoint.' : 'Keep upload headroom for other participants and devices.');
+    }
+    return [gaming, streaming, cloud, calls];
   }
   const networkLabels={unknown:'Not exposed',wifi:'Wi-Fi',ethernet:'Ethernet',cellular:'Cellular · generation unknown','3g':'3G','4g':'4G / LTE','5g':'5G',bluetooth:'Bluetooth',wimax:'WiMAX',mixed:'Multiple interfaces',other:'Other',none:'Offline'};
   function networkSnapshot(info,choice='auto',online=true) {
