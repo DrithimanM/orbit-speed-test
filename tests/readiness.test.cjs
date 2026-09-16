@@ -72,6 +72,8 @@ test("high jitter produces timing warnings instead of a blanket bandwidth downgr
     ],
   );
   assert.match(r[2].evidence, /45 ms jitter/);
+  assert.match(r[3].evidence, /45 ms jitter/);
+  assert.match(r[3].detail, /45 ms jitter/);
 });
 test("loaded delay uses a median, requires three valid probes, and preserves streaming capability", () => {
   const r = record({
