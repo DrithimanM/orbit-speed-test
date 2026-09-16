@@ -81,14 +81,18 @@ The in-app comparison links to the official services. They run separately; Orbit
 
 ## Connection ratings
 
-Ratings are transparent heuristics, not certified scores or tests against actual game/video-call services:
+Each readiness card shows a specific capability or bottleneck, its measured evidence, and practical advice when tapped. Ratings recalculate for saved completed flights; no history migration or new test is required. Invalid or interrupted measurements remain unrated. Access-type labels (Wi-Fi/5G/etc.) do not influence the assessment.
 
-| Activity | Higher rating criteria |
+These are transparent heuristics for the selected HTTP test route, not certified scores or tests against actual game/video-call services. Delay and bandwidth are assessed separately: a high-latency route can still have ample bandwidth for 4K streaming or HD calls.
+
+| Activity | Capability and limiting factors |
 | --- | --- |
-| Online gaming | Excellent: ping <40 ms, jitter <10 ms, download ≥10 Mbps, upload ≥3 Mbps. Good: ping <80 ms, jitter <20 ms, download ≥5 Mbps, upload ≥1 Mbps. |
-| Video streaming | 4K ≥15 Mbps, 1080p ≥5 Mbps, 720p ≥3 Mbps, following [Netflix guidance](https://help.netflix.com/en/node/306). Estimated simultaneous streams ignore overhead and competing traffic. |
-| Cloud gaming | Promising: download ≥25 Mbps, ping <40 ms, jitter <10 ms. Fair: ≥15 Mbps, <80 ms, <20 ms. Based loosely on [GeForce NOW requirements](https://www.nvidia.com/en-gb/geforce-now/system-reqs/); actual latency to NVIDIA is not measured. |
-| Video calls | Excellent: download ≥10 Mbps, upload ≥5 Mbps, ping <100 ms, jitter <20 ms. Good: ≥3 Mbps each way, <150 ms, <30 ms. Practical estimates for one call. |
+| Online gaming | 5 Mbps down / 1 Mbps up allowance. Responsive: idle RTT <40 ms and jitter <10 ms. Otherwise playable, with specific timing warnings at RTT ≥80 ms or jitter ≥15 ms; high latency at ≥150 ms, unstable timing at ≥30 ms jitter. These are Orbit heuristics for typical gameplay, not every game’s requirements. |
+| Video streaming | 4K ≥15 Mbps, 1080p ≥5 Mbps, 720p ≥3 Mbps, following [Netflix guidance](https://help.netflix.com/en/node/306). Below 3 Mbps, lower-resolution video; below 1 Mbps, buffering risk. Estimated stream counts exclude overhead and competing traffic. High RTT alone does not downgrade buffered-video bandwidth. |
+| Cloud gaming | Browser bandwidth tiers: 720p ≥15 Mbps, 1080p ≥25 Mbps, 1440p ≥35 Mbps, following [GeForce NOW](https://www.nvidia.com/en-gb/geforce-now/system-reqs/). RTT ≥80 ms flags input delay; jitter ≥20 ms flags uneven response. Responsive uses RTT <40 ms and jitter <10 ms; intermediate timing indicates some lag. NVIDIA’s actual datacenter RTT is not measured. |
+| Video calls | [Zoom guidance](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0058323): 1080p needs ≥3 Mbps down / 3.8 up; 720p group ≥1.8 / 2.6; 720p one-to-one ≥1.2 / 1.2; basic group video ≥0.6 / 1. Below that, audio-first; below 0.1 Mbps either way, dropout risk. The bandwidth tier remains visible alongside timing warnings: some delay at RTT ≥150 ms or jitter ≥20 ms; high delay ≥300 ms or choppy timing ≥40 ms jitter. Timing cutoffs are Orbit heuristics. |
+
+For interactive activities, a median loaded RTT rise of **≥80 ms** in either phase adds a **lag under load** warning when that phase has at least three valid probes. A stronger bandwidth/idle-timing constraint takes priority on the card, with load information in its popover. Missing or sparse loaded samples never imply a clean bill of health; older tests can still be assessed from their recorded bandwidth, idle RTT and jitter. Loaded HTTP latency includes endpoint scheduling and does not prove router bufferbloat. Streaming tiers estimate bandwidth, not packet-level stability or guaranteed resolution.
 
 ## Files and extension points
 
