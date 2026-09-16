@@ -40,8 +40,8 @@ function setup(mode='good',geo='denied') {
   assert.equal(run('SpeedCore.jitter([10,20,15])'),7.5);
   assert.equal(run('SpeedCore.distance([25,55],[25,55])'),0);
   assert.ok(run('SpeedCore.distance([25.2,55.3],[51.5,-.1])')>5000);
-  assert.equal(run("SpeedCore.ratings({downloadMbps:100,uploadMbps:20,pingMs:25,jitterMs:3})[0].grade"),'Excellent');
-  assert.equal(run("SpeedCore.ratings({downloadMbps:100,uploadMbps:20,pingMs:200,jitterMs:50})[0].grade"),'Limited');
+  assert.equal(run("SpeedCore.ratings({downloadMbps:100,uploadMbps:20,pingMs:25,jitterMs:3})[0].grade"),'Responsive');
+  assert.equal(run("SpeedCore.ratings({downloadMbps:100,uploadMbps:20,pingMs:200,jitterMs:50})[0].grade"),'High latency');
   await run('locate()'); assert.match(app.el('location-status').textContent,/denied/);assert.ok(run('servers.length')>1);assert.ok(run('servers.every(s=>s.available)'));
   assert.ok(run('SpeedCore.locations.every(city=>SpeedCore.validPoint(city.point))'));
   assert.equal(run("SpeedCore.suggestedLocation('Etc/UTC')"),undefined);
