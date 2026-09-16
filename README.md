@@ -1,6 +1,6 @@
-# Orbit — network speed test
+# Orbit Network Observatory
 
-A local, dependency-free web app with sustained measurements, location-aware server selection, live graphs, an animated rocket flight deck, access-type labels, startup ISP discovery, loaded-latency diagnostics, connection ratings, and test history. Developed by HigherIyer.
+A dependency-free network dashboard with an Apple-inspired dark interface, a circular flight gauge, sustained measurements, route discovery, and local test history. Built with semantic HTML, CSS and vanilla JavaScript. Developed by HigherIyer.
 
 ## Run
 
@@ -18,7 +18,7 @@ Open [the live HTTPS site](https://drithimanm.github.io/orbit-speed-test/) in a 
 
 On Android, use Chrome’s **Add to home screen → Install**. On iPhone/iPad, use Safari’s **Share → Add to Home Screen** (enable **Open as Web App** if offered). On macOS Sonoma 14+, Safari offers **File → Add to Dock**. Browser/version support varies.
 
-After one successful online load, the app shell is saved for offline use. Reopen Orbit offline to review graphs and export saved history. Fresh measurements, ISP information and server discovery require internet. The service worker never intercepts or caches external requests or uploads. An offline launch defers location, discovery and metadata until reconnection; full speed tests still require Start Test.
+After one successful online load, the app shell is saved for offline use. Reopen Orbit offline to review graphs and export saved history. Fresh measurements, ISP information and server discovery require internet. The service worker never intercepts or caches external requests or uploads. An offline launch defers location, discovery and metadata until reconnection; full speed tests still require Launch Test.
 
 History remains local to the browser’s storage context and origin. Chrome/Edge installations using the same profile normally share the site’s history. Safari web apps and other browser profiles can use separate storage: export important history before switching. Clearing site data can remove both history and the offline shell. Installing the GitHub site is convenient for daily use; a localhost installation still needs the local server online for initial setup and updates.
 
@@ -32,32 +32,36 @@ The site supplies PNG app icons, a 48 px PNG favicon fallback, a 180 px Apple to
 
 ## Use
 
-1. Orbit requests device location on launch and automatically checks nearby servers. Allow the browser prompt to use a device fix. If permission is denied or detection times out, a **clearly labelled timezone-based city suggestion** is used when available; otherwise servers are compared without a distance filter.
-2. The location bar shows the current search area and how it was chosen. **Change location** lets you select a city, choose **No location filter**, or retry **Use device location**. City centers are approximate; choosing a city does not change your IP or network route. A manual selection takes priority over a delayed device response.
-3. Keep **Automatic** to use the lowest-latency reachable candidate, or select another server from the cards/dropdown. **Scan servers** refreshes the measurements.
-4. Select **4 streams · capacity** (default) or **1 stream · path**, then press **Start Test**. Four simultaneous HTTP transfers help fill a fast connection; one flow helps compare a single-request path. Allow about a minute, or cancel whenever needed. The readout is measured speed; the ruler caps visually at 1,000 while larger values remain visible numerically.
-5. The **Your ISP / network** panel loads on startup. Expand **Connection details & network type** to see public IP / ASN and select a Wi-Fi, Ethernet, cellular, 3G, 4G/LTE or 5G label when the browser cannot detect it. Use **Refresh** after changing networks.
-6. Under **Find your fastest route**, filter by operator or exclude Cloudflare, and use **All reviewed servers** to look beyond the nearby shortlist.
-7. Review activity estimates and graphs. Saved flights can be reopened with **View**, or downloaded with **Export history**.
+1. On load, Orbit checks device location, looks up your ISP, and probes a nearby server shortlist. A labelled timezone suggestion is used if location is unavailable. No full speed test starts automatically.
+2. Open the **Auto / route pill** to see the search area, change location, filter operators, rescan, or choose a reachable endpoint. Four HTTP streams are the default; use the adjacent pill to switch to one.
+3. Choose **Launch Test**. Each direction measures at least 22 seconds. Allow about a minute; the visible data-use notice links to the shared 8 GB safety budget explanation. Cancel at any time.
+4. **Overview** shows the most recently inspected completed flight, readiness estimates, and the current/selected throughput trace. An interrupted flight keeps its partial trace and never receives a quality rating.
+5. **Telemetry & Nerd Stats** shows loaded RTT deltas, P50/P95/P99 idle latency, payload sizes, request/retry counters, access-type source, and reviewed endpoint paths. Hover the graph or use its keyboard/touch time slider to inspect actual samples. Lines connect measured intervals; they do not interpolate missing measurements.
+6. Use **Copy cURL** for one bounded HTTP RTT probe, **Copy Raw Stats**, or **Export JSON / CSV** for the inspected flight. cURL is copied, never executed. A selectable text dialog is available when clipboard access fails. Exports exclude public IP/ISP/ASN/location.
+7. **Flight History** has status badges, miniature traces, search and JSON archive export. The table initially renders 50 rows; **Show more** exposes the rest without limiting stored history. The app shortcut opens this view directly, including offline.
+
+Click the ISP near the page title to inspect current IP/ASN and set a manual Wi-Fi, Ethernet, cellular, 3G, 4G/LTE or 5G label. Current connection metadata is explicitly separate from historical flights. Info buttons explain browser limits, privacy, data use and heuristic ratings without crowding the dashboard.
+
+The segmented control supports Left/Right, Home and End keys. Dialogs and info popovers support Escape and return focus. Charts include text descriptions and an accessible time slider. The layout adapts to phones, tablets and desktop screens, respects reduced motion, and includes safe-area padding for installed iOS web apps.
 
 ## Measurements and server discovery
 
 - The app measures ten HTTP ping samples after a warm-up. Ping is the median, and jitter is the mean absolute difference between consecutive samples. It is not ICMP ping.
 - Download and upload each run for at least **22 seconds of elapsed wall time**. Requests already in flight are allowed to finish (20-second request timeout). Final Mbps = successfully completed payload bits / full elapsed phase time / 1,000,000. Time spent waiting or retrying remains in the denominator. Results are sustained averages, not peaks. Four streams share a phase clock; their rates are never added independently.
 - The trace plots aggregate completed bytes per sampling interval (about 500 ms), separately for download and upload. Requests finish in batches, so a trace can be bursty; it is not a packet-level link-rate capture. Browser scheduling, server load, transport overhead, Wi-Fi, VPNs and distance affect results.
-- An independent HTTP request samples latency about once per second **during** each transfer phase. Median loaded RTT, its difference from idle median, idle p95 (linear percentile interpolation), jitter, sample counts, retry counts and transferred payload are shown. These are end-to-end browser HTTP measurements including server scheduling. Missed probes are reported as missed HTTP probes, never as UDP packet loss. Actual game-server RTT and UDP packet loss are not measured.
+- An independent HTTP request samples latency about once per second **during** each transfer phase. Median loaded RTT, its difference from idle median, idle P50/P95/P99 (linear percentile interpolation; tail estimates from ten samples are coarse), jitter, sample counts, retry counts and transferred payload are shown. These are end-to-end browser HTTP measurements including server scheduling. Missed probes are reported as missed HTTP probes, never as UDP packet loss. Actual game-server RTT and UDP packet loss are not measured.
 - Four concurrent HTTP transfers may multiplex over one HTTP/2 or HTTP/3 connection. They do not guarantee four distinct TCP connections or saturation of every connection. Compare modes on the same endpoint for useful results.
-- Data use can reach several GB. Each Start Test invocation has a shared **8 GB planned-payload safety budget**, including transfer retries and recovery attempts. Startup discovery, metadata, headers and other transport overhead are outside that counter; it is not a billing guarantee. Cloudflare downloads are capped at **8,000,000 bytes per request**, below a reproduced 16 MB rejection. Other reviewed download endpoints retain a 16 MB request cap (LibreSpeed rounds to MiB); uploads cap at 8 MB, except **Clouvider uploads at 1,000,000 bytes** after a reproduced HTTP 413 above 1 MiB on Ashburn. Small HTTP payloads can constrain single-stream throughput on high-latency routes; compare 4-stream mode and other operators. Responses remain limited to 17 MiB. Every phase allows at most 1,000 transfer request attempts and 100 loaded-RTT outcomes.
+- Data use can reach several GB. Each Launch Test invocation has a shared **8 GB planned-payload safety budget**, including transfer retries and recovery attempts. Startup discovery, metadata, headers and other transport overhead are outside that counter; it is not a billing guarantee. Cloudflare downloads are capped at **8,000,000 bytes per request**, below a reproduced 16 MB rejection. Other reviewed download endpoints retain a 16 MB request cap (LibreSpeed rounds to MiB); uploads cap at 8 MB, except **Clouvider uploads at 1,000,000 bytes** after a reproduced HTTP 413 above 1 MiB on Ashburn. Small HTTP payloads can constrain single-stream throughput on high-latency routes; compare 4-stream mode and other operators. Responses remain limited to 17 MiB. Every phase allows at most 1,000 transfer request attempts and 100 loaded-RTT outcomes.
 - Discovery merges the [current LibreSpeed catalog](https://librespeed.org/backend-servers/servers.php) with the bundled reviewed catalog, deduplicating endpoints. This replaces the older GitHub list, which omitted active operators. The September 13, 2026 snapshot contains **26 public endpoints**, including four additional [Clouvider locations](https://as62240.net/speedtest): Manchester, Dallas, Ashburn and Phoenix. These additions passed HTTPS, CORS, download and upload checks; availability can change. Coordinates are approximate city centers. Only exact endpoints in `security.js` are eligible; live catalogs cannot introduce new destinations.
 - With a location, discovery checks up to **12 public endpoints plus Cloudflare**. The expanded scan allows up to 40 total candidates (currently 27), with three workers. **Server network** filters candidates before probing, including an option to exclude Cloudflare from measurements. Public metadata discovery still uses Cloudflare / RIPEstat regardless of test-server choice.
 - Candidate servers receive one warm-up, three latency probes, a small download, and a 1 KB upload. Requests include LibreSpeed's documented `cors` and `ckSize` parameters. Reachable servers are ranked by median latency. The winner is the lowest among the tested shortlist, not necessarily the fastest or geographically closest server worldwide.
 - Cloudflare is an additional automatically routed endpoint and has no fixed distance. Its data-center code is displayed when exposed in response headers. Unavailable or browser-blocked servers are disabled.
-- Start Test performs a larger preflight before timing. A failed transfer retries once at a smaller payload on the same endpoint. In **Automatic** mode, a failed attempt can restart the whole test on one other reachable endpoint. The UI announces the change and each attempt has its own history entry; results are never combined across endpoints. A manually selected endpoint never switches automatically. **Try next reachable server** offers explicit recovery after a failure. Cancellation and safety-budget stops do not trigger automatic recovery.
+- Launch Test performs a larger preflight before timing. A failed transfer retries once at a smaller payload on the same endpoint. In **Automatic** mode, a failed attempt can restart the whole test on one other reachable endpoint. The UI announces the change and each attempt has its own history entry; results are never combined across endpoints. A manually selected endpoint never switches automatically. **Try another route** offers explicit recovery after a failure. Cancellation and safety-budget stops do not trigger automatic recovery.
 
 ## Privacy and history
 
 - Device coordinates and selected cities remain in memory in this tab. They are used for local distance calculations, never sent in requests or saved in history. A built-in city list supplies approximate area labels without a reverse-geocoding service. Location is requested once on each page load and when you choose **Use device location**; the browser controls permission. A 15-second fallback prevents a dismissed prompt from blocking the app.
-- Page load automatically retrieves the server catalog and performs bounded discovery probes. This is separate from the sustained, potentially multi-GB test, which starts only when you press Start Test. Timezone suggestions may be far from your actual location; the location bar labels them explicitly and allows correction.
+- Page load automatically retrieves the server catalog and performs bounded discovery probes. This is separate from the sustained, potentially multi-GB test, which starts only when you press Launch Test. Timezone suggestions may be far from your actual location; the route dialog labels them explicitly and allows correction.
 - IP and ISP discovery runs on startup, manual refresh, and before a test when older than one minute. It uses Cloudflare response metadata with RIPEstat's [What's My IP](https://stat.ripe.net/docs/data-api/api-endpoints/whats-my-ip.html) fallback, followed by network-info and as-overview. Missing names and failed lookups have explicit states; refreshing clears stale identity. No API keys are required. Your public IP is sent to RIPEstat to identify the registered network holder. A VPN or upstream network may be shown instead of a retail ISP brand. Missing metadata does not prevent a test.
 - Test endpoints, the catalog host, and RIPEstat receive normal network request information including your public IP. Upload payloads are generated bytes, not personal files. No analytics are included.
 - IndexedDB saves each attempt when it starts and updates it on completion, failure, or cancellation. A tab closed mid-test leaves an unfinished entry. There is no arbitrary history-count limit, but browser storage quota/eviction still applies. Storage errors are shown with an export reminder.
@@ -92,18 +96,27 @@ Ratings are transparent heuristics, not certified scores or tests against actual
 - `dist/styles.css`: dark space theme, responsive layout, and motion; respects reduced-motion preferences.
 - `dist/rocket.png`: transparent rocket artwork.
 - `dist/higheriyer.png`: HigherIyer footer logo.
-- `dist/core.js`: statistics, provider request caps, distance, ratings, ruler scale, and local city suggestions.
+- `dist/core.js`: statistics, provider request caps, distance, ratings, gauge scale, and local city suggestions.
 - `dist/manifest.webmanifest`, `dist/pwa.js`, `dist/sw.js`: installation, offline shell and safe update lifecycle.
 - `dist/icon.svg`, `dist/icon-192.png`, `dist/icon-512.png`: launcher artwork.
 - `scripts/version-shell.mjs`: fingerprints app assets for cache updates.
-- `dist/app.js`: discovery, permission handling, measurements, graph rendering, and IndexedDB history.
+- `dist/app.js`: discovery, permissions, the measurement engine, and IndexedDB persistence.
+- `dist/ui.js`: view state, route dialog, popovers, graphs/scrubber, history rendering and export controls.
+- `dist/telemetry.js`: pure percentile/delta helpers, reviewed endpoint resolution, raw reports and CSV serialization.
+- `tests/telemetry.test.cjs`: derived values, incomplete records, export escaping, reviewed URLs and scrubber bounds.
 - `dist/servers.json`: fallback public catalog and city-center coordinate mapping.
 
 Change `MEASURE_MS`, request sizes, or rating thresholds to experiment. Update data-use notices when changing measurement duration. Add city centers to `servers.json` for new catalog locations.
 
 ## Security and publishing
 
+UI changes do not change the measurement schema or erase old history. CSV cells are quoted and formula-like strings are neutralized. Endpoint URLs for old flights are resolved from the current reviewed catalog, with variable request parameters omitted.
+
 After editing app assets, run `npm run cache:version`, then `npm run check` and `npm test` before publishing. Verification rejects an outdated shell fingerprint. Checks include the Cloudflare size regression, aggregate parallel throughput, loaded RTT, bounded retries, endpoint recovery, history compatibility, and cancellation. See [the security review](SECURITY.md) for controls and remaining limitations and [GitHub Pages deployment](DEPLOY.md) for setup. The app is hardened against the checked cases; it is not guaranteed immune to penetration testing.
+
+## Optional browser UI checks
+
+`npm test` requires only Node. For the browser suite, install Playwright in a separate tools directory (or make it available to Node), install its Chromium browser, start Orbit locally, then run `npm run test:browser`. If Playwright is installed elsewhere, set `ORBIT_PLAYWRIGHT_MODULE` to its module path. `ORBIT_TEST_URL` defaults to `http://localhost:8000`. The suite creates a fresh browser profile, blocks public endpoint traffic, seeds synthetic flights, and checks responsive layouts, keyboard navigation, exports, history and popovers. Screenshots go to a temporary directory. No test fixtures are written into your normal browser profile.
 
 ## History compatibility
 
