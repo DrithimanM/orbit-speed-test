@@ -107,7 +107,7 @@ const SpeedCore = (() => {
       : d >= 1.2 && u >= 1.2 ? '720p one-to-one'
       : d >= 0.6 && u >= 1 ? 'Basic video calls' : null;
     const callEvidence = `${number(u)} Mbps up · ${number(p)} ms RTT`;
-    const callDetail = `Measured ${number(d)} Mbps down / ${number(u)} Mbps up. Bandwidth tiers follow Zoom guidance for one call; timing warnings are Orbit heuristics.${loadDetail}`;
+    const callDetail = `Measured ${number(d)} Mbps down / ${number(u)} Mbps up, with ${number(p)} ms HTTP RTT and ${number(j)} ms jitter. Bandwidth tiers follow Zoom guidance for one call; timing warnings are Orbit heuristics.${loadDetail}`;
     let calls;
     if (d < 0.1 || u < 0.1) {
       calls = make(3, 'Call dropouts likely', 'poor', `${number(d)} ↓ / ${number(u)} ↑ Mbps`, callDetail,
@@ -120,7 +120,8 @@ const SpeedCore = (() => {
       const issue = p >= 300 ? 'high delay' : j >= 40 ? 'choppy timing' : congested ? 'lag under load' : p >= 150 || j >= 20 ? 'some delay' : '';
       calls = make(3, issue ? `${callTier} · ${issue}` : callTier,
         p >= 300 || j >= 40 ? 'poor' : issue || callTier === 'Basic video calls' ? 'fair' : 'good',
-        congested && p < 300 && j < 40 ? `${number(u)} Mbps up · +${number(load.delta)} ms loaded` : callEvidence,
+        issue === 'lag under load' ? `${number(u)} Mbps up · +${number(load.delta)} ms loaded`
+          : issue === 'choppy timing' || (j >= 20 && p < 150) ? `${number(u)} Mbps up · ${number(j)} ms jitter` : callEvidence,
         callDetail + ` ${callTier} have enough bandwidth; ${issue || 'idle timing is favorable'} on this test route.`,
         congested ? congestionAdvice : issue ? 'Allow for conversational delay; compare the calling app’s own statistics and another endpoint.' : 'Keep upload headroom for other participants and devices.');
     }
