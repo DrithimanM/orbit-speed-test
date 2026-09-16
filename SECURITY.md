@@ -33,3 +33,7 @@ Run `npm run check` and `npm test` on Node 22+. Tests cover destination and cata
 ## Reporting
 
 Use the repository's private vulnerability reporting feature if enabled. Avoid posting credentials, public-IP logs, precise locations, or exploit details in public issues. Test Orbit locally or on an explicitly authorized deployment; public test-server operators are not included in that authorization.
+
+## Observatory interface and exports
+
+The segmented views, route dialog and info popovers use DOM text nodes. The new UI and pure telemetry helper are local, allowlisted shell assets; no runtime framework or CDN was added. Saved history retains its validated schema and does not acquire IP/ISP/ASN/location fields. CSV quotes cells and prefixes formula-like text. Copy cURL resolves only reviewed catalog endpoints and prepares one ten-second-bounded GET probe; the browser never executes shell commands. Legacy catalog mappings are labelled, and live connection metadata is kept separate from inspected history.
