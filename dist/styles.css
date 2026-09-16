@@ -860,7 +860,7 @@ main {
 }
 .readiness-chip {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   text-align: left;
   gap: 10px;
   padding: 12px 10px;
@@ -868,7 +868,12 @@ main {
   background: #ffffff03;
   border: 1px solid var(--border);
 }
+.readiness-label {
+  min-width: 0;
+}
 .readiness-chip .readiness-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
   color: var(--cyan);
   font-size: 16px;
   width: 21px;
@@ -886,8 +891,26 @@ main {
   color: var(--text);
   margin-top: 2px;
 }
-.readiness-chip.limited small {
+.readiness-chip small {
+  font-weight: 600;
+  line-height: 1.45;
+}
+.readiness-chip[data-level="good"] small {
+  color: var(--cyan);
+}
+.readiness-chip[data-level="fair"] small {
   color: var(--amber);
+}
+.readiness-chip[data-level="poor"] small {
+  color: #ffb0b6;
+}
+.readiness-evidence {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .readiness-card > p {
   margin-top: 14px;

@@ -60,8 +60,8 @@ const OrbitUI = (() => {
     ],
     readiness: [
       "Route-specific estimates",
-      "These badges use measured bandwidth, idle RTT and jitter to estimate suitability. They do not test actual game, video-call or streaming service routes, UDP packet loss, or a sustained application session.",
-      "4K guidance uses 15 Mbps per Netflix stream. There is no universal 8K bitrate; compare your service’s codec and bitrate requirements with the measured throughput.",
+      "Each activity separates bandwidth capability from timing. Cards show the measured reason; tap one for guidance. A loaded-RTT rise of 80 ms or more flags lag under load when at least three probes are available.",
+      "These are estimates for the selected endpoint, not actual game or video-call routes. HTTP RTT includes server response time; UDP packet loss and sustained application sessions are not measured. Streaming bandwidth tiers follow Netflix; cloud gaming follows GeForce NOW; calls follow Zoom.",
     ],
     providers: [
       "Different servers, different paths",
@@ -172,28 +172,23 @@ const OrbitUI = (() => {
     });
   }
   function renderRatings(record) {
-    const ready = record?.status === "complete";
-    const ratings = ready
-      ? SpeedCore.ratings(record)
-      : ["Online gaming", "Video streaming", "Cloud gaming", "Video calls"].map(
-          (name) => ({
-            name,
-            grade: "Awaiting test",
-            detail: "Complete a flight to estimate suitability on this route.",
-          }),
-        );
+    const ratings = SpeedCore.ratings(record);
+    const ready =
+      record?.status === "complete" &&
+      ratings.every((rating) => rating.level !== "neutral");
     const icons = ["⌘", "▷", "☁", "◉"];
     $("ratings").replaceChildren();
     ratings.forEach((rating, index) => {
-      const chip = el(
-        "button",
-        undefined,
-        "readiness-chip" + (rating.grade === "Limited" ? " limited" : ""),
-      );
+      const chip = el("button", undefined, "readiness-chip");
       chip.type = "button";
+      chip.dataset.level = rating.level;
       chip.setAttribute("aria-expanded", "false");
-      const label = el("span");
-      label.append(el("strong", rating.name), el("small", rating.grade));
+      const label = el("span", undefined, "readiness-label");
+      label.append(
+        el("strong", rating.name),
+        el("small", rating.grade),
+        el("span", rating.evidence, "readiness-evidence"),
+      );
       const icon = el("span", icons[index], "readiness-icon");
       icon.setAttribute("aria-hidden", "true");
       chip.append(icon, label);
@@ -201,6 +196,7 @@ const OrbitUI = (() => {
         openInfo(chip, [
           rating.name,
           rating.detail,
+          rating.advice,
           "Estimate for this endpoint. Actual service latency and UDP packet loss are not measured.",
         ]),
       );

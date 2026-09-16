@@ -1,5 +1,5 @@
 // Update this fingerprint with npm run cache:version after changing app assets.
-const CACHE_VERSION = 'a688e4d2d4078380149e';
+const CACHE_VERSION = 'ad1ad959e093f06bb590';
 const SHELL_FILES = [
   "index.html", "styles.css", "security.js", "core.js", "telemetry.js", "ui.js", "app.js", "pwa.js",
   "servers.json", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png",
