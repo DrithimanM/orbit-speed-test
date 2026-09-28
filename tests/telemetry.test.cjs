@@ -115,6 +115,14 @@ test("CSV quotes commas and newlines and neutralizes spreadsheet formulas", () =
   assert.equal(T.csvCell("line\nbreak"), '"line\nbreak"');
   assert.match(T.csv([record]), /download_duration_ms/);
 });
+test("the themed report preserves flight data and escapes record text", () => {
+  const report = T.report({ ...record, server: '<img src=x onerror=alert(1)>' });
+  assert.match(report, /Orbit Network Observatory/);
+  assert.match(report, /Mission readiness/);
+  assert.match(report, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(report, /<img src=x onerror/);
+  assert.doesNotMatch(report, /Public IP:/);
+});
 test("scrubbing returns measured samples only within the recorded range", () => {
   assert.equal(T.sampleAt(phase.points, 0.5), null);
   assert.equal(T.sampleAt(phase.points, 3), null);
