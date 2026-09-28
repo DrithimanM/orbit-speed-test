@@ -219,6 +219,15 @@ const OrbitTelemetry = (() => {
     output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
     return output;
   }
+  function markdown(record) {
+    if (!record) return null;
+    const derived=stats(record), total=((derived.download.bytes || 0)+(derived.upload.bytes || 0))/1e6;
+    const deltas=[derived.download.deltaMs,derived.upload.deltaMs].filter(Number.isFinite);
+    const delta=deltas.length?Math.max(...deltas):null;
+    const grade=SpeedCore.bufferbloatGrade(delta) || "—";
+    const readiness=SpeedCore.ratings(record).map(item=>`${item.name}: ${item.grade}`).join(" | ");
+    return `### Orbit Network Diagnostic Report\n- **Timestamp:** ${record.finished || record.date}\n- **Route / Edge:** ${record.server}\n- **Transport:** ${record.transport === 'h3' ? 'HTTP/3 (QUIC / UDP)' : record.transport === 'h2' ? 'HTTP/2 (TCP / TLS)' : 'Not exposed'}\n- **Downlink:** ${number(record.downloadMbps)} Mbps (Single-request baseline: ${number(record.singleMbps)} Mbps | Efficiency: ${number(record.efficiencyRatio)}%)\n- **Uplink:** ${number(record.uploadMbps)} Mbps\n- **Latency Profile:** Idle: ${number(derived.idle.p50Ms)} ms (P95: ${number(derived.idle.p95Ms)} ms | P99: ${number(derived.idle.p99Ms)} ms) | Jitter: ${number(record.jitterMs)} ms\n- **Bufferbloat:** ${delta===null?'—':`+${number(delta)} ms`} under load (Grade ${grade})\n- **Application Readiness:** ${readiness}\n- **Data Transferred:** ${number(total)} MB`;
+  }
   function sampleAt(points, seconds) {
     if (
       !points?.length ||
@@ -244,6 +253,7 @@ const OrbitTelemetry = (() => {
     csv,
     report,
     pdf,
+    markdown,
     sampleAt,
   };
 })();

@@ -109,7 +109,7 @@ const OrbitSecurity = (() => {
     if(!/^[a-fA-F0-9:.]+$/.test(value) || !value.includes(':'))return false;
     try {return new URL(`https://[${value}]/`).hostname.startsWith('[');}catch{return false;}
   }
-  const recordKeys=new Set(['id','date','status','server','serverId','pings','download','upload','pingMs','jitterMs','downloadMbps','uploadMbps','finished','error','streams','profile','measurementVersion','recoveryFrom','network']);
+  const recordKeys=new Set(['id','date','status','server','serverId','pings','download','upload','pingMs','jitterMs','downloadMbps','uploadMbps','finished','error','streams','profile','measurementVersion','recoveryFrom','network','transport','singleMbps','efficiencyRatio']);
   function validNetwork(n) {
     return n && typeof n==='object' && Object.keys(n).length===4 && Object.keys(n).every(k=>['type','source','effectiveType','saveData'].includes(k)) &&
       ['unknown','wifi','ethernet','cellular','3g','4g','5g','bluetooth','wimax','mixed','other','none'].includes(n.type) &&
@@ -121,6 +121,9 @@ const OrbitSecurity = (() => {
     if(r.network!==undefined && !validNetwork(r.network))return false;
     if(r.streams!==undefined && ![1,4].includes(r.streams))return false;
     if(r.profile!==undefined && !['quick','sustained'].includes(r.profile))return false;
+    if(r.transport!==undefined && !['h2','h3','http/1.1'].includes(r.transport))return false;
+    if(r.singleMbps!==undefined && !finite(r.singleMbps))return false;
+    if(r.efficiencyRatio!==undefined && (!finite(r.efficiencyRatio) || r.efficiencyRatio>100))return false;
     if(r.measurementVersion!==undefined && r.measurementVersion!==2)return false;
     if(r.recoveryFrom!==undefined && (typeof r.recoveryFrom!=='string' || r.recoveryFrom.length>200))return false;
     if(r.serverId!==undefined && (typeof r.serverId!=='string' || r.serverId.length>100))return false;

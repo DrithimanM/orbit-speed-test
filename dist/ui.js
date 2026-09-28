@@ -401,7 +401,7 @@ const OrbitUI = (() => {
         : T.statusLabel(record.status)
       : "Waiting for samples";
     $("diag-state").className = "status-pill " + (record?.status || "");
-    for (const id of ["copy-stats", "export-report", "export-pdf", "export-json", "export-csv"])
+    for (const id of ["copy-stats", "copy-report", "export-report", "export-pdf", "export-json", "export-csv"])
       $(id).disabled = !record;
     $("copy-curl").disabled = !paths;
     $("view-context").textContent = record
@@ -733,6 +733,9 @@ const OrbitUI = (() => {
     );
     $("copy-stats").addEventListener("click", () =>
       copy(JSON.stringify(T.raw(displayed, catalog), null, 2), "Raw stats"),
+    );
+    $("copy-report").addEventListener("click", () =>
+      copy(T.markdown(displayed), "Diagnostic report"),
     );
     $("export-report").addEventListener("click", () => {
       if (displayed)

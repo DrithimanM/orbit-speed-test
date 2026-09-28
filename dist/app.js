@@ -64,7 +64,8 @@ async function request(url, options = {}, signal, timeout = 20000, asJson = fals
   const response = await fetch(safeURL, {...options, redirect:'error', referrerPolicy:'no-referrer', credentials:'omit', cache:'no-store', signal:combined});
   if (!response.ok) {const error=new Error(`HTTP ${response.status} from ${new URL(safeURL).hostname}`);error.status=response.status;throw error;}
   const body = await OrbitSecurity.readBody(response,asJson ? 1048576 : 17*1048576,asJson);
-  return {body, response, ms:Math.max(0.1, performance.now()-started)};
+  const entry=performance.getEntriesByName(safeURL).at(-1);
+  return {body, response, ms:Math.max(0.1,performance.now()-started), protocol:entry?.nextHopProtocol || null};
 }
 function testURL(server, kind, bytes=0) {
   const cf = server.type === 'cloudflare';
@@ -269,6 +270,9 @@ function showDiagnostics(record) {
   $('diag-state').textContent=record ? record.status==='complete' ? 'COMPLETE DATASET' : 'LIVE / PARTIAL DATA' : 'WAITING FOR SAMPLES';
   $('diag-network').textContent=SpeedCore.networkLabel(record?.network);
   $('diag-mode').textContent=record ? `${record.streams || 1} HTTP stream${record.streams===4?'s':''}${record.measurementVersion===2?' · wall time':' · legacy'}` : 'Select a measurement mode';
+  const protocol=record?.transport;
+  $('diag-transport').replaceChildren(document.createTextNode(protocol==='h3'?'HTTP/3 · QUIC / UDP':protocol==='h2'?'HTTP/2 · TCP / TLS':protocol?'HTTP '+protocol:'Browser managed'),node('span',protocol?'Observed with Resource Timing':'Protocol not exposed','sub-value'));
+  $('diag-efficiency').textContent=Number.isFinite(record?.efficiencyRatio) ? `${format(record.efficiencyRatio)}% · ${format(record.singleMbps)} Mbps one-request baseline` : record ? 'Needs a completed multi-stream flight' : 'Available after a completed flight';
   $('diag-p95').textContent=record?.pings?.length ? `${format(SpeedCore.percentile(record.pings,.95))} ms · n=${record.pings.length}` : '—';
   for(const direction of ['download','upload']){
     const result=record?.[direction], values=result?.loadedPings || [];
@@ -322,7 +326,7 @@ async function bandwidth(server,direction,record,run) {
     while(!signal.aborted && performance.now()-started<run.durationMs && result.loadedPings.length+result.probeFailures<100){
       try {const sample=await request(testURL(server,'ping'),{},signal,1000);if(!signal.aborted)result.loadedPings.push(sample.ms);}
       catch {if(!signal.aborted)result.probeFailures++;}
-      if(!signal.aborted)await delay(250,signal);
+      if(!signal.aborted)await delay(200,signal);
     }
   })();
   const worker=async()=>{
@@ -386,7 +390,7 @@ async function testAttempt(server,run,recoveryFrom) {
     if(metadataController || Date.now()-metadataUpdated>60000)await connectionInfo(controller.signal);controller.signal.throwIfAborted();
     // Larger than discovery probes, still separate from the timed measurement.
     reservePayload(run,1048576+262144);
-    const preflight=await request(testURL(server,'download',1048576),{},controller.signal,10000);
+    const preflight=await request(testURL(server,'download',1048576),{},controller.signal,10000);record.transport=preflight.protocol || undefined;record.singleMbps=preflight.body.byteLength*8/preflight.ms/1000;
     if(preflight.body.byteLength<1048576 || !preflight.response.headers.get('content-type')?.includes('application/octet-stream'))throw new Error('Endpoint did not return test data');
     await request(testURL(server,'upload'),{method:'POST',body:new Uint8Array(262144),headers:{'Content-Type':'text/plain'}},controller.signal,10000);
     stage='Idle latency';phase('ping','MEASURING IDLE RTT');
@@ -397,7 +401,7 @@ async function testAttempt(server,run,recoveryFrom) {
       $('live-value').textContent=$('ping').textContent;updateDial(SpeedCore.median(record.pings),'ms');setProgress(i+1);drawPings(record.pings);showDiagnostics(record);
     }
     record.pingMs=SpeedCore.median(record.pings);record.jitterMs=SpeedCore.jitter(record.pings);
-    stage='Download';record.downloadMbps=(await bandwidth(server,'download',record,run)).mbps;
+    stage='Download';record.downloadMbps=(await bandwidth(server,'download',record,run)).mbps;record.efficiencyRatio=record.streams===4 ? Math.min(100,record.singleMbps/record.downloadMbps*100) : 100;
     stage='Upload';record.uploadMbps=(await bandwidth(server,'upload',record,run)).mbps;
     record.status='complete';record.server=endpointLabel(server);$('server').textContent=record.server;
     setProgress(100);phase(null,'MISSION COMPLETE');$('live-value').textContent=format(record.downloadMbps);updateDial(record.downloadMbps);$('live-label').textContent=`${run.profile==='quick'?'Quick':'Sustained'} downlink average`;

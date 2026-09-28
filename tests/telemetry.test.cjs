@@ -130,6 +130,12 @@ test("the direct PDF export is a themed, self-contained PDF", () => {
   assert.match(file, /Flight report/);
   assert.doesNotMatch(file, /window\.print|blob:/);
 });
+test("the Markdown report contains diagnostics without raw connection identity", () => {
+  const report=T.markdown({...record,transport:'h3'});
+  assert.match(report,/HTTP\/3 \(QUIC \/ UDP\)/);
+  assert.match(report,/Bufferbloat:/);
+  assert.doesNotMatch(report,/192\.0\.2\./);
+});
 test("scrubbing returns measured samples only within the recorded range", () => {
   assert.equal(T.sampleAt(phase.points, 0.5), null);
   assert.equal(T.sampleAt(phase.points, 3), null);

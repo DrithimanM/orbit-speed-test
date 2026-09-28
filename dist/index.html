@@ -449,10 +449,7 @@
             </div>
             <div>
               <dt>Transport connections</dt>
-              <dd>
-                Browser managed
-                <span class="sub-value">TCP / QUIC count not exposed</span>
-              </dd>
+              <dd id="diag-transport">Browser managed<span class="sub-value">Protocol pending</span></dd>
             </div>
             <div>
               <dt>Completed payload</dt>
@@ -475,6 +472,10 @@
               <dd id="diag-network">Not recorded</dd>
             </div>
             <div>
+              <dt>Single-to-multi efficiency</dt>
+              <dd id="diag-efficiency">Available after a completed flight</dd>
+            </div>
+            <div>
               <dt>Tested server</dt>
               <dd id="server">Automatic selection</dd>
             </div>
@@ -495,6 +496,7 @@
           <div class="export-toolbar">
             <button id="export-report" class="secondary" disabled>Export Report</button
             ><button id="export-pdf" class="secondary" disabled>Save PDF</button
+            ><button id="copy-report" class="secondary" disabled>Copy Report</button
             ><button id="copy-curl" class="secondary" disabled>Copy cURL</button
             ><button id="copy-stats" class="secondary" disabled>
               Copy Raw Stats</button
