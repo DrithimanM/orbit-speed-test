@@ -123,10 +123,11 @@
             <p class="eyebrow">HOROLOGICAL TEST DECK</p>
             <h2>Network<br />observatory.</h2>
             <p class="deck-subtitle">Measured throughput. Route-aware latency.</p>
-            <div class="profile-selector" role="group" aria-label="Test profile">
-              <button id="profile-quick" class="profile-option active" type="button" data-profile="quick"><span>Quick Probe</span><small>5 s × 2</small></button>
-              <button id="profile-sustained" class="profile-option" type="button" data-profile="sustained"><span>Sustained Flight</span><small>15 s × 2</small></button>
-            </div>
+            <button id="profile-toggle" class="profile-switch" type="button" role="switch" aria-checked="false" aria-label="Test profile: Quick Probe">
+              <span class="profile-name profile-quick"><b>Quick Probe</b><small>5 s × 2</small></span>
+              <span class="profile-knob" aria-hidden="true"></span>
+              <span class="profile-name profile-sustained"><b>Sustained Flight</b><small>15 s × 2</small></span>
+            </button>
             <div class="compact-controls">
               <button
                 id="open-routes"

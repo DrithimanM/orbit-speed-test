@@ -29,7 +29,7 @@ function setProgress(value) {
 function setBusy() {
   const offline = navigator.onLine === false;
   const busy = offline || scanning || locating || Boolean(controller);
-  for (const id of ['start','scan','server-select','stream-count','server-scope','provider-filter','profile-quick','profile-sustained']) $(id).disabled = busy;
+  for (const id of ['start','scan','server-select','stream-count','server-scope','provider-filter','profile-toggle']) $(id).disabled = busy;
   for (const id of ['location-choice','apply-location']) $(id).disabled = scanning || Boolean(controller);
   $('network-choice').disabled=Boolean(controller);
   $('refresh-connection').disabled=offline || Boolean(controller || metadataController);
@@ -502,10 +502,12 @@ $('retry').addEventListener('click',()=>{selectedId='auto';renderServers();start
 $('scan').addEventListener('click',discoverServers);
 for(const id of ['server-scope','provider-filter'])$(id).addEventListener('change',()=>{selectedId='auto';discoverServers();});
 $('unmask-ip').addEventListener('change',showIP);
-for(const button of (document.querySelectorAll?.('[data-profile]') || []))button.addEventListener('click',()=>{
+$('profile-toggle').addEventListener('click',()=>{
   if(controller || scanning)return;
-  activeProfile=button.dataset.profile==='sustained'?'sustained':'quick';
-  for(const option of (document.querySelectorAll?.('[data-profile]') || []))option.classList.toggle('active',option===button);
+  activeProfile=activeProfile==='quick'?'sustained':'quick';
+  const sustained=activeProfile==='sustained';
+  $('profile-toggle').setAttribute('aria-checked',String(sustained));
+  $('profile-toggle').setAttribute('aria-label',`Test profile: ${profile().label}`);
   $('profile-duration').textContent=`${profile().durationMs/1000} s per direction`;
   $('status').textContent=`${profile().label} armed · route lock uses edge RTT.`;
 });
