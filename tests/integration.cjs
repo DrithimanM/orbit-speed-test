@@ -4,6 +4,7 @@ const vm = require('node:vm');
 
 const app = fs.readFileSync('dist/app.js', 'utf8');
 const html = fs.readFileSync('dist/index.html', 'utf8');
+const ui = fs.readFileSync('dist/ui.js', 'utf8');
 const security = require('../dist/security.js');
 const coreContext = vm.createContext({});
 vm.runInContext(fs.readFileSync('dist/core.js', 'utf8'), coreContext);
@@ -22,6 +23,8 @@ assert.doesNotMatch(app, /innerHTML|outerHTML|insertAdjacentHTML|\beval\(|new Fu
 assert.match(html, /id="profile-toggle"/);
 assert.match(html, /role="switch"/);
 assert.match(html, /id="unmask-ip"/);
+assert.match(html, /id="export-pdf"/);
+assert.match(ui, /Choose Save to PDF in the print dialog/);
 assert.doesNotMatch(html, /rocket\.png|id="rocket"/);
 assert.match(html, /mechanical-progress/);
 

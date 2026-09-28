@@ -401,7 +401,7 @@ const OrbitUI = (() => {
         : T.statusLabel(record.status)
       : "Waiting for samples";
     $("diag-state").className = "status-pill " + (record?.status || "");
-    for (const id of ["copy-stats", "export-report", "export-json", "export-csv"])
+    for (const id of ["copy-stats", "export-report", "export-pdf", "export-json", "export-csv"])
       $(id).disabled = !record;
     $("copy-curl").disabled = !paths;
     $("view-context").textContent = record
@@ -741,6 +741,25 @@ const OrbitUI = (() => {
           "text/html;charset=utf-8",
           "orbit-flight-report.html",
         );
+    });
+    $("export-pdf").addEventListener("click", () => {
+      if (!displayed) return;
+      const url = URL.createObjectURL(
+        new Blob([T.report(displayed)], { type: "text/html;charset=utf-8" }),
+      );
+      const reportWindow = window.open(url, "orbit-flight-report");
+      if (!reportWindow) {
+        URL.revokeObjectURL(url);
+        $("export-status").textContent = "Allow pop-ups to open the PDF dialog.";
+        return;
+      }
+      reportWindow.opener = null;
+      reportWindow.addEventListener("load", () => {
+        reportWindow.focus();
+        reportWindow.print();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }, { once: true });
+      $("export-status").textContent = "Choose Save to PDF in the print dialog.";
     });
     $("export-json").addEventListener("click", () => {
       if (displayed)
