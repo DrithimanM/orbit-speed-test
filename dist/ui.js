@@ -759,7 +759,7 @@ const OrbitUI = (() => {
         reportWindow.print();
         setTimeout(() => URL.revokeObjectURL(url), 60000);
       }, { once: true });
-      $("export-status").textContent = "Choose Save to PDF in the print dialog.";
+      $("export-status").textContent = "Choose Save to PDF; enable Background graphics if your browser offers it.";
     });
     $("export-json").addEventListener("click", () => {
       if (displayed)
