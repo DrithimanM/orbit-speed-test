@@ -269,7 +269,7 @@ function delay(ms,signal) {
 function showDiagnostics(record) {
   $('diag-state').textContent=record ? record.status==='complete' ? 'COMPLETE DATASET' : 'LIVE / PARTIAL DATA' : 'WAITING FOR SAMPLES';
   $('diag-network').textContent=SpeedCore.networkLabel(record?.network);
-  $('diag-mode').textContent=record ? `${record.streams || 1} HTTP stream${record.streams===4?'s':''}${record.measurementVersion===2?' · wall time':' · legacy'}` : 'Select a measurement mode';
+  $('diag-mode').textContent=record ? `${record.streams || 1} HTTP stream${record.streams>1?'s':''}${record.measurementVersion===2?' · wall time':' · legacy'}` : 'Select a measurement mode';
   const protocol=record?.transport;
   $('diag-transport').replaceChildren(document.createTextNode(protocol==='h3'?'HTTP/3 · QUIC / UDP':protocol==='h2'?'HTTP/2 · TCP / TLS':protocol?'HTTP '+protocol:'Browser managed'),node('span',protocol?'Observed with Resource Timing':'Protocol not exposed','sub-value'));
   $('diag-efficiency').textContent=Number.isFinite(record?.efficiencyRatio) ? `${format(record.efficiencyRatio)}% · ${format(record.singleMbps)} Mbps one-request baseline` : record ? 'Needs a completed multi-stream flight' : 'Available after a completed flight';
@@ -315,7 +315,7 @@ async function bandwidth(server,direction,record,run) {
       lastSample=result.durationMs;lastBytes=result.bytes;drawSpeed(record);
     }
     $('flight-time').textContent=`T + ${(result.durationMs/1000).toFixed(0).padStart(2,'0')} s`;
-    status(`${direction==='download'?'Download':'Upload'} · ${record.streams} stream${record.streams===4?'s':''} · ${(result.durationMs/1000).toFixed(1)} / ${(run.durationMs/1000).toFixed(0)} s`);
+    status(`${direction==='download'?'Download':'Upload'} · ${record.streams} stream${record.streams>1?'s':''} · ${(result.durationMs/1000).toFixed(1)} / ${(run.durationMs/1000).toFixed(0)} s`);
     setProgress((direction==='download'?5:52.5)+Math.min(47.5,result.durationMs/run.durationMs*47.5));
     $(direction).textContent=format(result.mbps);$('live-value').textContent=format(result.mbps);updateDial(result.mbps);
     $(`${direction}-detail`).textContent=`${(result.durationMs/1000).toFixed(1)} s · ${(result.bytes/1000000).toFixed(0)} MB`;
@@ -401,7 +401,7 @@ async function testAttempt(server,run,recoveryFrom) {
       $('live-value').textContent=$('ping').textContent;updateDial(SpeedCore.median(record.pings),'ms');setProgress(i+1);drawPings(record.pings);showDiagnostics(record);
     }
     record.pingMs=SpeedCore.median(record.pings);record.jitterMs=SpeedCore.jitter(record.pings);
-    stage='Download';record.downloadMbps=(await bandwidth(server,'download',record,run)).mbps;record.efficiencyRatio=record.streams===4 ? Math.min(100,record.singleMbps/record.downloadMbps*100) : 100;
+    stage='Download';record.downloadMbps=(await bandwidth(server,'download',record,run)).mbps;record.efficiencyRatio=record.streams===3 ? Math.min(100,record.singleMbps/record.downloadMbps*100) : 100;
     stage='Upload';record.uploadMbps=(await bandwidth(server,'upload',record,run)).mbps;
     record.status='complete';record.server=endpointLabel(server);$('server').textContent=record.server;
     setProgress(100);phase(null,'MISSION COMPLETE');$('live-value').textContent=format(record.downloadMbps);updateDial(record.downloadMbps);$('live-label').textContent=`${run.profile==='quick'?'Quick':'Sustained'} downlink average`;
@@ -429,7 +429,7 @@ async function startTest() {
   const candidates=automatic ? servers.filter(s=>s.available).slice(0,2) : servers.filter(s=>s.id===selectedId && s.available);
   if(!candidates.length){status('No reachable endpoint selected. Scan servers to find another route.');return {error:'No server'};}
   const selectedProfile=profile();
-  const run={streams:Number($('stream-count').value)===1?1:4,profile:activeProfile,durationMs:selectedProfile.durationMs,reserved:0,stopped:false};
+  const run={streams:Number($('stream-count').value)===1?1:3,profile:activeProfile,durationMs:selectedProfile.durationMs,reserved:0,stopped:false};
   controller=new AbortController();setBusy();document.body.classList.remove('error');$('retry').hidden=true;
   let record,recoveryFrom;
   try {

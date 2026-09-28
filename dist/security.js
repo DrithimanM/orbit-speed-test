@@ -119,7 +119,7 @@ const OrbitSecurity = (() => {
   function validRecord(r) {
     if(!r || typeof r!=='object' || Object.keys(r).some(key=>!recordKeys.has(key)) || typeof r.id!=='string' || r.id.length>100 || typeof r.date!=='string' || !Number.isFinite(Date.parse(r.date)) || typeof r.server!=='string' || r.server.length>200 || !['running','failed','cancelled','complete'].includes(r.status))return false;
     if(r.network!==undefined && !validNetwork(r.network))return false;
-    if(r.streams!==undefined && ![1,4].includes(r.streams))return false;
+    if(r.streams!==undefined && ![1,3,4].includes(r.streams))return false;
     if(r.profile!==undefined && !['quick','sustained'].includes(r.profile))return false;
     if(r.transport!==undefined && !['h2','h3','http/1.1'].includes(r.transport))return false;
     if(r.singleMbps!==undefined && !finite(r.singleMbps))return false;
