@@ -67,6 +67,36 @@ async function request(url, options = {}, signal, timeout = 20000, asJson = fals
   const entry=performance.getEntriesByName(safeURL).at(-1);
   return {body, response, ms:Math.max(0.1,performance.now()-started), protocol:entry?.nextHopProtocol || null};
 }
+async function measureWireLatency() {
+  if(typeof RTCPeerConnection!=='function')return null;
+  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.cloudflare.com:3478'},{urls:'stun:stun.l.google.com:19302'}]});
+  let timer;
+  try {
+    pc.createDataChannel('latency-probe',{ordered:false,maxRetransmits:0});
+    await Promise.race([
+      (async()=>{await pc.setLocalDescription(await pc.createOffer());if(pc.iceGatheringState==='complete')return;await new Promise(resolve=>pc.addEventListener('icegatheringstatechange',()=>pc.iceGatheringState==='complete'&&resolve(),{once:true}));})(),
+      new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('STUN timeout')),1200);}),
+    ]);
+    const stats=await pc.getStats();
+    for(const stat of stats.values())if(stat.type==='candidate-pair'&&stat.state==='succeeded'&&Number.isFinite(stat.currentRoundTripTime))return Math.round(stat.currentRoundTripTime*1000);
+    return null;
+  }catch{return null;}finally{clearTimeout(timer);pc.close();}
+}
+async function measureApplicationLatency(targetUrl, signal) {
+  const safeURL=OrbitSecurity.approvedURL(targetUrl,document.baseURI);
+  const probe=async method=>{
+    const started=performance.now();
+    const response=await fetch(safeURL,{method,cache:'no-store',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(5000)])});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    await response.body?.cancel();
+    return Math.max(.1,performance.now()-started);
+  };
+  await probe('HEAD');
+  const samples=[];
+  for(let i=0;i<5;i++)samples.push(await probe('GET'));
+  samples.splice(samples.indexOf(Math.max(...samples)),1);
+  return {median:SpeedCore.median(samples),samples};
+}
 function testURL(server, kind, bytes=0) {
   const cf = server.type === 'cloudflare';
   const path = cf ? (kind === 'upload' ? '__up' : '__down') : server[kind === 'ping' ? 'pingURL' : kind === 'download' ? 'dlURL' : 'ulURL'];
@@ -393,14 +423,13 @@ async function testAttempt(server,run,recoveryFrom) {
     const preflight=await request(testURL(server,'download',1048576),{},controller.signal,10000);record.transport=preflight.protocol || undefined;record.singleMbps=preflight.body.byteLength*8/preflight.ms/1000;
     if(preflight.body.byteLength<1048576 || !preflight.response.headers.get('content-type')?.includes('application/octet-stream'))throw new Error('Endpoint did not return test data');
     await request(testURL(server,'upload'),{method:'POST',body:new Uint8Array(262144),headers:{'Content-Type':'text/plain'}},controller.signal,10000);
-    stage='Idle latency';phase('ping','MEASURING IDLE RTT');
-    await request(testURL(server,'ping'),{},controller.signal);
-    for(let i=0;i<4;i++){
-      record.pings.push((await request(testURL(server,'ping'),{},controller.signal)).ms);
-      $('ping').textContent=format(SpeedCore.median(record.pings));$('jitter').textContent=format(SpeedCore.jitter(record.pings));
-      $('live-value').textContent=$('ping').textContent;updateDial(SpeedCore.median(record.pings),'ms');setProgress(i+1);drawPings(record.pings);showDiagnostics(record);
-    }
-    record.pingMs=SpeedCore.median(record.pings);record.jitterMs=SpeedCore.jitter(record.pings);
+    stage='Idle latency';phase('ping','WARMING APPLICATION PATH');
+    const [wireLatency,applicationLatency]=await Promise.all([measureWireLatency(),measureApplicationLatency(testURL(server,'ping'),controller.signal)]);
+    record.pings=applicationLatency.samples;record.appLatencyMs=applicationLatency.median;record.wireLatencyMs=wireLatency;
+    record.pingMs=wireLatency ?? applicationLatency.median;record.jitterMs=SpeedCore.jitter(record.pings);
+    $('ping').textContent=format(record.pingMs);$('jitter').textContent=format(SpeedCore.jitter(record.pings));
+    $('ping-detail').textContent=wireLatency===null ? `App RTT ${format(applicationLatency.median)} ms · wire probe unavailable` : `Wire ${wireLatency} ms · App RTT ${format(applicationLatency.median)} ms`;
+    $('live-value').textContent=$('ping').textContent;updateDial(record.pingMs,'ms');setProgress(5);drawPings(record.pings);showDiagnostics(record);
     stage='Download';record.downloadMbps=(await bandwidth(server,'download',record,run)).mbps;record.efficiencyRatio=record.streams===3 ? Math.min(100,record.singleMbps/record.downloadMbps*100) : 100;
     stage='Upload';record.uploadMbps=(await bandwidth(server,'upload',record,run)).mbps;
     record.status='complete';record.server=endpointLabel(server);$('server').textContent=record.server;

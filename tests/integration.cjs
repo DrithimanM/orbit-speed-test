@@ -19,6 +19,8 @@ assert.match(app, /delta>=100/);
 assert.match(app, /await delay\(200,signal\)/);
 assert.match(html, /id="copy-report"/);
 assert.match(app, /function redactIP/);
+assert.match(app, /async function measureWireLatency/);
+assert.match(app, /async function measureApplicationLatency/);
 assert.match(app, /function showIP/);
 assert.doesNotMatch(app, /innerHTML|outerHTML|insertAdjacentHTML|\beval\(|new Function/);
 assert.match(html, /id="profile-toggle"/);
