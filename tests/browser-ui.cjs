@@ -233,6 +233,9 @@ const assert = require("node:assert/strict");
   await page.locator("#open-routes").click();
   assert.equal(await page.locator("#route-dialog").isVisible(), true);
   await page.getByRole("button", { name: "About these networks ⓘ" }).click();
+  await page.waitForFunction(
+    () => !document.querySelector("#info-popover").hidden,
+  );
   assert.equal(await page.locator("#info-popover").isVisible(), true);
   await page.keyboard.press("Escape");
   assert.equal(await page.locator("#route-dialog").isVisible(), true);

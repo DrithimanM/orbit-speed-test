@@ -6,7 +6,7 @@
   <meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="description" content="Sustained network measurements, nearby servers, and connection history.">
   <title>Orbit · Network Observatory</title>
-  <meta name="theme-color" content="#0c0e12">
+  <meta name="theme-color" content="#0b1426">
   <meta name="apple-mobile-web-app-title" content="Orbit">
   <link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">
   <link rel="icon" href="icon.svg" type="image/svg+xml" sizes="any">
@@ -41,8 +41,8 @@
       </p>
       <div class="page-heading">
         <div>
-          <p class="eyebrow">SIGNAL. WITHOUT THE NOISE.</p>
-          <h1>Your connection. In focus.</h1>
+          <p class="eyebrow">PRECISION NETWORK INSTRUMENT</p>
+          <h1>Measure the signal.</h1>
         </div>
         <button
           class="connection-badge"
@@ -67,7 +67,7 @@
             ><i aria-hidden="true"></i
             ><span id="phase">SYSTEM READY</span></span
           ><span class="deck-duration"
-            >22 s per direction
+            ><span id="profile-duration">5 s per direction</span>
             <button
               class="info-button"
               type="button"
@@ -112,15 +112,6 @@
               <text x="280" y="288">1,000</text>
             </svg>
             <div class="gauge-reading">
-              <div class="rocket-beacon" aria-hidden="true">
-                <img
-                  id="rocket"
-                  src="rocket.png"
-                  alt=""
-                  width="60"
-                  height="60"
-                /><span class="exhaust"></span>
-              </div>
               <div class="live-reading"><output id="live-value">—</output></div>
               <span id="live-unit">Mbps</span>
               <p id="live-label">Ready for takeoff</p>
@@ -129,9 +120,13 @@
             <span id="flight-time" class="flight-time">T + 00 s</span>
           </div>
           <div class="launch-deck">
-            <p class="eyebrow">NETWORK FLIGHT DECK</p>
-            <h2>Explore your<br />connection’s capacity.</h2>
-            <p class="deck-subtitle">Sustained speed. Real-world latency.</p>
+            <p class="eyebrow">HOROLOGICAL TEST DECK</p>
+            <h2>Network<br />observatory.</h2>
+            <p class="deck-subtitle">Measured throughput. Route-aware latency.</p>
+            <div class="profile-selector" role="group" aria-label="Test profile">
+              <button id="profile-quick" class="profile-option active" type="button" data-profile="quick"><span>Quick Probe</span><small>5 s × 2</small></button>
+              <button id="profile-sustained" class="profile-option" type="button" data-profile="sustained"><span>Sustained Flight</span><small>15 s × 2</small></button>
+            </div>
             <div class="compact-controls">
               <button
                 id="open-routes"
@@ -166,7 +161,7 @@
               </button>
             </div>
             <p class="launch-caption">
-              High data use · up to 8 GB
+              Profile-limited data use · up to 8 GB safety cap
               <button
                 type="button"
                 class="info-button"
@@ -205,7 +200,7 @@
           </article>
           <article id="jitter-card">
             <h3>
-              <span class="amber">∿</span> Jitter
+              <span class="amber">△</span> Bufferbloat
               <button
                 class="info-button"
                 data-info="jitter"
@@ -214,20 +209,15 @@
                 i
               </button>
             </h3>
-            <div><output id="jitter">—</output><span>ms</span></div>
-            <p>Consecutive variation</p>
+            <div><output id="jitter">—</output><span id="buffer-unit">Δ ms</span></div>
+            <p id="buffer-detail">Grade — · loaded vs idle</p>
           </article>
         </div>
         <div class="deck-status">
           <p id="status" role="status" aria-live="polite">
             Choose a route and launch a sustained test.
           </p>
-          <progress
-            id="progress"
-            value="0"
-            max="100"
-            aria-label="Test progress"
-          ></progress>
+          <div id="progress" class="mechanical-progress" role="progressbar" aria-label="Test progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
         </div>
       </section>
 
@@ -553,6 +543,7 @@
               <dd id="network-estimate">—</dd>
             </div>
           </dl>
+          <label class="redaction-toggle"><input id="unmask-ip" type="checkbox"> <span>Unmask diagnostic IP</span></label>
           <div class="connection-edit">
             <label for="network-choice">Label this connection</label
             ><select id="network-choice">
@@ -677,8 +668,8 @@
       <section class="location-section">
         <div class="section-head">
           <div>
-            <p id="location-source" class="small">Checking your search area</p>
-            <h3 id="location-name">Locating you…</h3>
+            <p id="location-source" class="small">Route lock uses network edge response time</p>
+            <h3 id="location-name">No GPS routing</h3>
           </div>
           <button
             id="change-location"
@@ -686,7 +677,7 @@
             aria-expanded="false"
             aria-controls="location-editor"
           >
-            Change location
+            Route preferences
           </button>
         </div>
         <div id="location-editor" class="location-editor" hidden>
@@ -697,12 +688,11 @@
             </option>
           </select>
           <div class="button-row">
-            <button id="apply-location" class="secondary">Use this area</button
-            ><button id="locate" class="secondary">Use device location</button>
+            <button id="apply-location" class="secondary">Apply preference</button>
           </div>
         </div>
         <p id="location-status" class="small" role="status">
-          Checking device location automatically.
+          No GPS or browser location prompt. Route selection uses measured edge RTT.
         </p>
       </section>
       <div class="server-filters">

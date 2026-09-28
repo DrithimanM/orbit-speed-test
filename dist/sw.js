@@ -1,9 +1,9 @@
 // Update this fingerprint with npm run cache:version after changing app assets.
-const CACHE_VERSION = '195c4a09319484f0bd04';
+const CACHE_VERSION = '858dbd18b4e0477f11e5';
 const SHELL_FILES = [
   "index.html", "styles.css", "security.js", "core.js", "telemetry.js", "ui.js", "app.js", "pwa.js",
   "servers.json", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png",
-  "rocket.png", "higheriyer.png", "favicon-48.png", "apple-touch-icon.png"
+  "higheriyer.png", "favicon-48.png", "apple-touch-icon.png"
 ];
 const ROOT = new URL('./', self.location.href);
 const CACHE_PREFIX = `orbit-shell:${ROOT.pathname}:`;
@@ -26,6 +26,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
+  // Telemetry payloads and all dynamic measurement requests are always network-only.
+  if (url.hostname.endsWith('cloudflare.com') || url.pathname.includes('/__down') || url.pathname.includes('/__up') || url.pathname.endsWith('.bin') || url.searchParams.has('nocache')) return;
   // Do not intercept speed traffic, ISP lookups, remote catalogs, uploads or other apps.
   if (request.method !== 'GET' || url.origin !== ROOT.origin) return;
   url.search = ''; url.hash = '';

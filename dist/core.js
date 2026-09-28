@@ -207,6 +207,14 @@ const SpeedCore = (() => {
     return distance(point,nearest.point)<60 ? `Near ${nearest.name}` : `${Math.abs(point[0]).toFixed(1)}° ${point[0]<0?'S':'N'}, ${Math.abs(point[1]).toFixed(1)}° ${point[1]<0?'W':'E'}`;
   }
   const suggestedLocation = zone => locations.find(city=>city.zones.includes(zone));
+  function bufferbloatGrade(delta) {
+    if (!Number.isFinite(delta)) return null;
+    if (delta <= 5) return 'A+';
+    if (delta <= 15) return 'A';
+    if (delta <= 30) return 'B';
+    if (delta <= 60) return 'C';
+    return 'F';
+  }
   const dialFraction = value => Number.isFinite(value) ? Math.min(1,Math.max(0,value)/1000) : 0;
-  return {networkSnapshot, networkLabel, networkLabels, median, percentile, transferCap, jitter, distance, ratings, locations, validPoint, locationName, suggestedLocation, dialFraction};
+  return {networkSnapshot, networkLabel, networkLabels, median, percentile, transferCap, jitter, distance, ratings, locations, validPoint, locationName, suggestedLocation, bufferbloatGrade, dialFraction};
 })();

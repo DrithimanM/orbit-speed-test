@@ -1,7 +1,8 @@
 /* Orbit: plain browser JavaScript. No build tools, frameworks, or tracking. */
 const EMBEDDED = typeof window !== 'undefined' && window.self !== window.top;
 const $ = id => document.getElementById(id);
-const MEASURE_MS = 22000;
+const PROFILES = Object.freeze({quick:{label:'Quick Probe',durationMs:5000},sustained:{label:'Sustained Flight',durationMs:15000}});
+let activeProfile = 'quick';
 const CF = {id:'cloudflare', name:'Cloudflare · automatic edge', type:'cloudflare', base:'https://speed.cloudflare.com/',provider:'Cloudflare'};
 let servers = [], locationPoint = null, scanning = false, locating = false;
 let controller = null, connection = {}, current = null, historyRecords = [];
@@ -18,16 +19,23 @@ function node(tag, text, className) {
 }
 const format = value => Number.isFinite(value) ? (value < 10 ? value.toFixed(2) : value.toFixed(1)) : '—';
 function status(text) { $('status').textContent = text; }
+function profile() { return PROFILES[activeProfile]; }
+function setProgress(value) {
+  const safe=Math.max(0,Math.min(100,Number(value)||0)), progress=$('progress');
+  progress.setAttribute('aria-valuenow',String(safe));
+  const fill=progress.querySelector?.('i');
+  if(fill)fill.style.transform=`scaleX(${safe/100})`;
+}
 function setBusy() {
   const offline = navigator.onLine === false;
   const busy = offline || scanning || locating || Boolean(controller);
-  for (const id of ['start','scan','locate','server-select','stream-count','server-scope','provider-filter']) $(id).disabled = busy;
+  for (const id of ['start','scan','server-select','stream-count','server-scope','provider-filter','profile-quick','profile-sustained']) $(id).disabled = busy;
   for (const id of ['location-choice','apply-location']) $(id).disabled = scanning || Boolean(controller);
   $('network-choice').disabled=Boolean(controller);
   $('refresh-connection').disabled=offline || Boolean(controller || metadataController);
   $('cancel').hidden = !controller;
-  $('start-label').textContent = controller ? 'Test in flight' : locating ? 'Locating…' : scanning ? 'Finding route…' : offline ? 'Offline' : 'Launch Test';
-  $('start').setAttribute('aria-label',controller ? 'Speed test in progress' : locating || scanning ? 'Preparing the test route' : offline ? 'Reconnect to run a speed test' : 'Launch speed test');
+  $('start-label').textContent = controller ? 'Measuring' : scanning ? 'Locking route…' : offline ? 'Offline' : 'Start probe';
+  $('start').setAttribute('aria-label',controller ? 'Speed test in progress' : scanning ? 'Locking the test route' : offline ? 'Reconnect to run a speed test' : 'Start speed test');
   document.body.classList.toggle('running', Boolean(controller));
   document.body.classList.toggle('preparing', locating || scanning);
 }
@@ -76,6 +84,12 @@ function captureMetadata(response, target=connection) {
   if (/^[1-9]\d{0,9}$/.test(get('asn') || '') && Number(get('asn'))<=4294967295) target.asn = get('asn');
   if (/^[A-Z]{3}$/.test(get('colo') || '')) target.colo = get('colo');
 }
+function redactIP(value) {
+  if(!OrbitSecurity.validIP(value))return 'Unavailable';
+  if(value.includes(':'))return value.split(':').slice(0,3).map(part=>part || '0').join(':')+'::****';
+  const parts=value.split('.');return `${parts[0]}.${parts[1]}.${parts[2]}.***`;
+}
+function showIP() { $('ip').textContent=$('unmask-ip').checked && connection.ip ? connection.ip : redactIP(connection.ip); }
 function currentNetwork() {
   return SpeedCore.networkSnapshot(networkAPI,$('network-choice').value,navigator.onLine);
 }
@@ -101,7 +115,7 @@ async function connectionInfo(signal) {
       if(OrbitSecurity.validIP(ip))next.ip=ip;
     }
     if(!next.ip)throw new Error('Public IP unavailable');
-    if(metadataController===attempt)$('ip').textContent=next.ip;
+    if(metadataController===attempt) { connection=next;showIP(); }
     if(!next.asn) {
       const asns=(await lookup('network-info',next.ip))?.asns;
       const candidate=Array.isArray(asns) ? asns[0] : undefined;
@@ -116,14 +130,14 @@ async function connectionInfo(signal) {
     if(metadataController===attempt) {
       connection=next;metadataController=null;
       metadataUpdated=combined.aborted ? 0 : Date.now();
-      $('ip').textContent=next.ip || 'Unavailable';$('isp').textContent=next.isp || (next.asn ? 'Name lookup unavailable' : 'Lookup unavailable');$('asn').textContent=next.asn ? `AS${next.asn}` : 'Unavailable';
+      showIP();$('isp').textContent=next.isp || (next.asn ? 'Name lookup unavailable' : 'Lookup unavailable');$('asn').textContent=next.asn ? `AS${next.asn}` : 'Unavailable';
       $('connection-status').textContent=next.isp ? 'Detected · registered network holder. A VPN or upstream carrier may appear instead of your retail ISP.' : 'Could not fully identify this connection. Refresh to retry; speed tests still work.';
       setBusy();
     }
   }
 }
 
-// Device fixes and city suggestions stay in memory; no reverse-geocoding service.
+// Route preferences are manual only. Orbit never requests device GPS location.
 function showLocation(name,source) {
   $('location-name').textContent=name;
   $('location-source').textContent=source;
@@ -136,20 +150,13 @@ function initializeLocation() {
   const select=$('location-choice');
   select.replaceChildren(new Option('No location filter · compare by latency','none'));
   for(const [index,city] of SpeedCore.locations.entries())select.append(new Option(city.name,String(index)));
-  let suggested;
-  try {suggested=SpeedCore.suggestedLocation(Intl.DateTimeFormat().resolvedOptions().timeZone);}catch { /* Optional suggestion. */ }
-  if(suggested) {
-    locationPoint=[...suggested.point];locationSource='suggested';
-    select.value=String(SpeedCore.locations.indexOf(suggested));
-    showLocation(suggested.name,'Suggested area · browser timezone, not a device fix');
-  }else{
-    select.value='none';showLocation('No location filter','Choose a city or use your device location');
-  }
+  select.value='none'; locationPoint=null; locationSource='none';
+  showLocation('No GPS routing','Manual city preference is optional; automatic selection uses edge RTT.');
   if (navigator.onLine === false) {
-    $('location-status').textContent='Offline · device location and nearby server checks resume when you reconnect.';
+    $('location-status').textContent='Offline · route lock resumes when you reconnect.';
     return;
   }
-  return locate();
+  return discoverServers();
 }
 async function applyLocation() {
   if(EMBEDDED || scanning || controller)return;
@@ -159,37 +166,8 @@ async function applyLocation() {
   locationAttempt?.abort();locationAttempt=null;locating=false;
   locationPoint=city ? [...city.point] : null;locationSource=city ? 'manual' : 'none';selectedId='auto';
   showLocation(city ? city.name : 'No location filter',city ? 'Selected area · approximate city center' : 'Servers compared by measured latency');
-  $('location-status').textContent=city ? 'Using this city to shortlist servers. This changes the search area, not your network location.' : 'Comparing available servers without a distance filter.';
+  $('location-status').textContent=city ? 'Using this optional city preference to shortlist servers. No device location was requested.' : 'Comparing available servers by measured latency.';
   closeLocationEditor();setBusy();
-  await discoverServers();
-}
-async function locate() {
-  if (EMBEDDED || navigator.onLine === false || controller || scanning || locating) return;
-  if (!navigator.geolocation) { $('location-status').textContent = 'Device location is unavailable. Using the displayed search area; you can change it.'; await discoverServers(); return; }
-  const attempt=new AbortController();locationAttempt=attempt;
-  locating = true; setBusy();
-  $('location-status').textContent = 'Checking device location… Allow the browser prompt, or choose a search area with Change location.';
-  try {
-    const position = await new Promise((resolve,reject) => {
-      const finish=(callback,value)=>{clearTimeout(timer);attempt.signal.removeEventListener('abort',abort);callback(value);};
-      const abort=()=>finish(reject,{name:'AbortError'});
-      // A dismissed permission prompt must not leave the launch control stuck.
-      const timer=setTimeout(()=>finish(reject,{code:3}),15000);
-      attempt.signal.addEventListener('abort',abort,{once:true});
-      try {navigator.geolocation.getCurrentPosition(position=>finish(resolve,position),error=>finish(reject,error),{enableHighAccuracy:false,timeout:12000,maximumAge:300000});}catch(error){finish(reject,error);}
-    });
-    if(attempt.signal.aborted)return;
-    const point=[position.coords.latitude,position.coords.longitude];
-    if(!SpeedCore.validPoint(point))throw new Error('Invalid device location');
-    locationPoint=point;locationSource='device';selectedId='auto';
-    showLocation(SpeedCore.locationName(point),'Device location · approximate area');
-    $('location-status').textContent = 'Device location found. Finding nearby servers; coordinates stay in this page.';
-    closeLocationEditor();
-  } catch (error) {
-    if(attempt.signal.aborted)return;
-    $('location-status').textContent = (error.code === 1 ? 'Location permission was denied. ' : 'Device location could not be determined. ')+(locationPoint ? 'Using the displayed search area. Change it if you are elsewhere.' : 'Comparing servers by latency. You can choose a city instead.');
-  } finally { if(locationAttempt===attempt){locationAttempt=null;locating=false;setBusy();} }
-  if(attempt.signal.aborted)return;
   await discoverServers();
 }
 function normalizeServer(item, cities) {
@@ -207,52 +185,40 @@ function normalizeServer(item, cities) {
 }
 async function probe(server) {
   try {
-    await request(testURL(server,'ping'),{},undefined,2500); // Connection warm-up.
-    const pings = [];
-    for (let i=0;i<3;i++) pings.push((await request(testURL(server,'ping'),{},undefined,2500)).ms);
-    // Verify that both transfer directions are usable before recommending an endpoint.
-    const check = await request(testURL(server,'download',1024),{},undefined,4000);
-    if (!check.response.headers.get('content-type')?.includes('application/octet-stream') || check.body.byteLength < 1024) throw new Error('Invalid download');
-    await request(testURL(server,'upload'),{method:'POST',body:new Uint8Array(1024),headers:{'Content-Type':'text/plain'}},undefined,4000);
-    server.latency = SpeedCore.median(pings); server.available = true;
+    // Route lock intentionally measures one bounded HTTP RTT per candidate.
+    // AbortSignal.timeout makes the entire parallel window at most 800 ms.
+    const sample=await request(testURL(server,'ping'),{},AbortSignal.timeout(800),800);
+    server.latency=sample.ms;server.available=true;
   } catch { server.available = false; server.latency = null; }
 }
 async function discoverServers() {
   if (navigator.onLine === false || scanning || controller || locating) return;
   scanning = true; setBusy();
-  $('scan-status').textContent = 'Loading the public server catalog…';
+  $('scan-status').textContent = 'Locking a route from network edge RTT…';
   try {
     const snapshot = (await request('servers.json',{},undefined,5000,true)).body;
     OrbitUI.setCatalog(snapshot);
-    let catalog = Array.isArray(snapshot.servers) ? snapshot.servers : [];
-    let catalogLabel = `bundled catalog (${snapshot.updated})`;
-    try {
-      const live = (await request('https://librespeed.org/backend-servers/servers.php',{},undefined,5000,true)).body;
-      if (Array.isArray(live) && live.length && live.length<=500) { catalog = [...live,...catalog]; catalogLabel = 'live LibreSpeed + reviewed additions'; }
-    } catch { /* Bundled snapshot keeps discovery available if the catalog host fails. */ }
+    const catalog = Array.isArray(snapshot.servers) ? snapshot.servers : [];
     const seen=new Set();
     const candidates = catalog.slice(0,1000).flatMap(item => { try { const server=normalizeServer(item,snapshot.cities);if(!server)return [];const key=new URL(server.pingURL,server.base).href;if(seen.has(key))return [];seen.add(key);return [server]; } catch { return []; } });
     candidates.sort((a,b)=>(a.distance ?? Infinity)-(b.distance ?? Infinity));
     const provider=$('provider-filter').value;
     const matches=server=>provider==='independent' ? server.type!=='cloudflare' : ['Cloudflare','Clouvider','Sharktech','Community / research'].includes(provider) ? server.provider===provider : true;
     const pool=[{...CF},...candidates].filter(matches);
-    const expanded=$('server-scope').value==='all' || !locationPoint;
-    servers=pool.slice(0,expanded ? 40 : (pool[0]?.type==='cloudflare' ? 13 : 12));
-    $('catalog-summary').textContent=`${candidates.length} reviewed public endpoints + Cloudflare · ${expanded ? 'expanded scan' : 'nearby shortlist'} · ${servers.length} candidates in this scan`;
-    let done=0, cursor=0;
-    const worker = async () => {
-      while(cursor < servers.length) {
-        const server = servers[cursor++];
-        await probe(server); done++;
-        $('scan-status').textContent = `Checking latency and transfers… ${done}/${servers.length}`;
-      }
-    };
-    await Promise.all([worker(),worker(),worker()]);
+    const expanded=$('server-scope').value==='all';
+    // A small, simultaneous pool makes auto-lock responsive. Cloudflare remains
+    // a deterministic fallback if no reviewed endpoint answers in the window.
+    servers=pool.slice(0,expanded ? 12 : 8);
+    if(!servers.some(server=>server.id==='cloudflare'))servers.unshift({...CF});
+    $('catalog-summary').textContent=`${candidates.length} reviewed endpoints + Cloudflare · ${servers.length} parallel edge probes`;
+    await Promise.allSettled(servers.map(probe));
     servers.sort((a,b)=>(a.latency ?? Infinity)-(b.latency ?? Infinity));
     const valid = servers.filter(s=>s.available);
+    if(!valid.length){const fallback=servers.find(server=>server.id==='cloudflare')||{...CF};fallback.available=true;fallback.latency=null;servers=[fallback];}
     if (!valid.some(s=>s.id===selectedId)) selectedId='auto';
     renderServers();
-    $('scan-status').textContent = valid.length ? `${valid.length} reachable · ${catalogLabel}. Recommended: ${valid[0].name} (${Math.round(valid[0].latency)} ms). Lowest among these candidates, not every server worldwide.` : 'No test servers could be reached. Check your connection or blockers, then scan again.';
+    const best=servers.find(server=>server.available);
+    $('scan-status').textContent = best?.latency !== null ? `ARMED · ${best.name} · ${Math.round(best.latency)} ms edge RTT.` : 'ARMED · Cloudflare anycast fallback.';
   } catch {
     servers=[]; renderServers(); $('scan-status').textContent='Could not load the server catalog. Reload or try scanning again.';
   } finally { scanning=false; setBusy(); }
@@ -309,6 +275,14 @@ function showDiagnostics(record) {
     $('loaded-'+direction).textContent=values.length ? `${format(SpeedCore.median(values))} ms` : '—';
     $('loaded-'+direction+'-detail').textContent=values.length ? `${record.pingMs===undefined ? 'Baseline pending' : `${SpeedCore.median(values)-record.pingMs>=0?'+':''}${format(SpeedCore.median(values)-record.pingMs)} ms vs idle`} · n=${values.length}` : 'HTTP RTT during transfer';
   }
+  const deltas=['download','upload'].map(direction=>{
+    const values=record?.[direction]?.loadedPings || [];
+    return record?.pingMs!==undefined && values.length ? SpeedCore.median(values)-record.pingMs : null;
+  }).filter(Number.isFinite);
+  const delta=deltas.length ? Math.max(...deltas) : null;
+  const grade=SpeedCore.bufferbloatGrade(delta) || '—';
+  $('jitter').textContent=delta===null?'—':format(delta);
+  $('buffer-detail').textContent=delta===null?'Grade — · loaded vs idle':`Grade ${grade} · ${delta>=0?'+':''}${format(delta)} ms loaded RTT`;
   const total=(record?.download?.bytes || 0)+(record?.upload?.bytes || 0);
   const requests=(record?.download?.requests || 0)+(record?.upload?.requests || 0);
   const retries=(record?.download?.retries || 0)+(record?.upload?.retries || 0);
@@ -332,28 +306,28 @@ async function bandwidth(server,direction,record,run) {
     result.durationMs=Math.max(.1,performance.now()-started);result.transferMs=result.durationMs;
     result.mbps=result.bytes*8/result.durationMs/1000;
     const delta=result.durationMs-lastSample;
-    if(delta>=500 || (final && delta>0 && result.bytes>lastBytes)){
+    if(delta>=100 || (final && delta>0 && result.bytes>lastBytes)){
       result.points.push({seconds:result.durationMs/1000,mbps:(result.bytes-lastBytes)*8/delta/1000});
       lastSample=result.durationMs;lastBytes=result.bytes;drawSpeed(record);
     }
     $('flight-time').textContent=`T + ${(result.durationMs/1000).toFixed(0).padStart(2,'0')} s`;
-    status(`${direction==='download'?'Download':'Upload'} · ${record.streams} stream${record.streams===4?'s':''} · ${(result.durationMs/1000).toFixed(0)} / 22 s minimum`);
-    $('progress').value=(direction==='download'?10:55)+Math.min(45,result.durationMs/MEASURE_MS*45);
+    status(`${direction==='download'?'Download':'Upload'} · ${record.streams} stream${record.streams===4?'s':''} · ${(result.durationMs/1000).toFixed(1)} / ${(run.durationMs/1000).toFixed(0)} s`);
+    setProgress((direction==='download'?5:52.5)+Math.min(47.5,result.durationMs/run.durationMs*47.5));
     $(direction).textContent=format(result.mbps);$('live-value').textContent=format(result.mbps);updateDial(result.mbps);
     $(`${direction}-detail`).textContent=`${(result.durationMs/1000).toFixed(1)} s · ${(result.bytes/1000000).toFixed(0)} MB`;
     showDiagnostics(record);
   };
   // Separate HTTP probes share the loaded connection. This is not ICMP or packet loss.
   const monitor=(async()=>{
-    while(!signal.aborted && performance.now()-started<MEASURE_MS && result.loadedPings.length+result.probeFailures<100){
-      try {const sample=await request(testURL(server,'ping'),{},signal,4000);if(!signal.aborted)result.loadedPings.push(sample.ms);}
+    while(!signal.aborted && performance.now()-started<run.durationMs && result.loadedPings.length+result.probeFailures<100){
+      try {const sample=await request(testURL(server,'ping'),{},signal,1000);if(!signal.aborted)result.loadedPings.push(sample.ms);}
       catch {if(!signal.aborted)result.probeFailures++;}
-      if(!signal.aborted)await delay(1000,signal);
+      if(!signal.aborted)await delay(250,signal);
     }
   })();
   const worker=async()=>{
     let size=250000;
-    while(performance.now()-started<MEASURE_MS){
+    while(performance.now()-started<run.durationMs){
       signal.throwIfAborted();
       if(result.requests>=1000 || performance.now()-started>90000){const error=new Error('Measurement safety limit reached.');error.code='LIMIT';throw error;}
       let response;
@@ -379,7 +353,7 @@ async function bandwidth(server,direction,record,run) {
       size=Math.round(Math.min(cap,Math.max(65536,size*1200/response.ms)));
     }
   };
-  update();const ticker=setInterval(update,500);
+  update();const ticker=setInterval(update,100);
   try {
     const workers=Array.from({length:record.streams},()=>worker().catch(error=>{firstError ||= error;local.abort();}));
     await Promise.all(workers);
@@ -397,14 +371,14 @@ function failureMessage(error,server,stage) {
   return `${stage} at ${host}: ${reason}.`;
 }
 async function testAttempt(server,run,recoveryFrom) {
-  const record={id:crypto.randomUUID(),date:new Date().toISOString(),status:'running',server:server.name,serverId:server.id,pings:[],download:null,upload:null,streams:run.streams,measurementVersion:2,network:currentNetwork()};
+  const record={id:crypto.randomUUID(),date:new Date().toISOString(),status:'running',server:server.name,serverId:server.id,pings:[],download:null,upload:null,streams:run.streams,profile:run.profile,measurementVersion:2,network:currentNetwork()};
   if(recoveryFrom)record.recoveryFrom=recoveryFrom;
   current=record;let stage='Preflight';
   for(const id of ['download','upload','ping','jitter','live-value'])$(id).textContent='—';
   for(const id of ['download','upload'])$(`${id}-detail`).textContent='Sustained average';
   $('server').textContent=server.name;$('diag-endpoint').textContent=new URL(server.base).hostname;
   $('route-note').textContent=recoveryFrom ? `Previous endpoint failed. Starting a separate test on ${server.name}.` : `Testing ${server.name}.`;
-  $('progress').value=0;
+  setProgress(0);
   drawSpeed(record);drawPings();showRatings();showDiagnostics(record);updateDial();
   await saveRecord(record);
   try {
@@ -417,16 +391,16 @@ async function testAttempt(server,run,recoveryFrom) {
     await request(testURL(server,'upload'),{method:'POST',body:new Uint8Array(262144),headers:{'Content-Type':'text/plain'}},controller.signal,10000);
     stage='Idle latency';phase('ping','MEASURING IDLE RTT');
     await request(testURL(server,'ping'),{},controller.signal);
-    for(let i=0;i<10;i++){
+    for(let i=0;i<4;i++){
       record.pings.push((await request(testURL(server,'ping'),{},controller.signal)).ms);
       $('ping').textContent=format(SpeedCore.median(record.pings));$('jitter').textContent=format(SpeedCore.jitter(record.pings));
-      $('live-value').textContent=$('ping').textContent;updateDial(SpeedCore.median(record.pings),'ms');$('progress').value=i+1;drawPings(record.pings);showDiagnostics(record);
+      $('live-value').textContent=$('ping').textContent;updateDial(SpeedCore.median(record.pings),'ms');setProgress(i+1);drawPings(record.pings);showDiagnostics(record);
     }
     record.pingMs=SpeedCore.median(record.pings);record.jitterMs=SpeedCore.jitter(record.pings);
     stage='Download';record.downloadMbps=(await bandwidth(server,'download',record,run)).mbps;
     stage='Upload';record.uploadMbps=(await bandwidth(server,'upload',record,run)).mbps;
     record.status='complete';record.server=endpointLabel(server);$('server').textContent=record.server;
-    $('progress').value=100;phase(null,'MISSION COMPLETE');$('live-value').textContent=format(record.downloadMbps);updateDial(record.downloadMbps);$('live-label').textContent='Download · sustained average';
+    setProgress(100);phase(null,'MISSION COMPLETE');$('live-value').textContent=format(record.downloadMbps);updateDial(record.downloadMbps);$('live-label').textContent=`${run.profile==='quick'?'Quick':'Sustained'} downlink average`;
     status('Test complete. Throughput and latency under load are ready.');showRatings(record);
   }catch(error){
     record.status=controller.signal.aborted ? 'cancelled' : 'failed';
@@ -450,7 +424,8 @@ async function startTest() {
   const automatic=selectedId==='auto';
   const candidates=automatic ? servers.filter(s=>s.available).slice(0,2) : servers.filter(s=>s.id===selectedId && s.available);
   if(!candidates.length){status('No reachable endpoint selected. Scan servers to find another route.');return {error:'No server'};}
-  const run={streams:Number($('stream-count').value)===1?1:4,reserved:0,stopped:false};
+  const selectedProfile=profile();
+  const run={streams:Number($('stream-count').value)===1?1:4,profile:activeProfile,durationMs:selectedProfile.durationMs,reserved:0,stopped:false};
   controller=new AbortController();setBusy();document.body.classList.remove('error');$('retry').hidden=true;
   let record,recoveryFrom;
   try {
@@ -515,7 +490,7 @@ function viewRecord(record) {
   updateDial(completed ? record.downloadMbps : 0);phase(null,'RECORDED FLIGHT');
   $('live-label').textContent=completed ? 'Download · sustained average' : 'Incomplete measurement';
   status(`Viewing ${new Date(record.date).toLocaleString()} · ${record.status}${record.error ? ' · '+record.error:''}`);
-  $('progress').value=completed ? 100:0;
+  setProgress(completed ? 100:0);
   document.body.classList.toggle('error',record.status==='failed');
   return true;
 }
@@ -526,11 +501,18 @@ $('cancel').addEventListener('click',()=>controller?.abort());
 $('retry').addEventListener('click',()=>{selectedId='auto';renderServers();startTest();});
 $('scan').addEventListener('click',discoverServers);
 for(const id of ['server-scope','provider-filter'])$(id).addEventListener('change',()=>{selectedId='auto';discoverServers();});
+$('unmask-ip').addEventListener('change',showIP);
+for(const button of (document.querySelectorAll?.('[data-profile]') || []))button.addEventListener('click',()=>{
+  if(controller || scanning)return;
+  activeProfile=button.dataset.profile==='sustained'?'sustained':'quick';
+  for(const option of (document.querySelectorAll?.('[data-profile]') || []))option.classList.toggle('active',option===button);
+  $('profile-duration').textContent=`${profile().durationMs/1000} s per direction`;
+  $('status').textContent=`${profile().label} armed · route lock uses edge RTT.`;
+});
 $('network-choice').addEventListener('change',showNetwork);
 $('refresh-connection').addEventListener('click',()=>connectionInfo());
 networkAPI?.addEventListener?.('change',showNetwork);
 window.addEventListener('online',()=>{showNetwork();setBusy();});window.addEventListener('offline',()=>{showNetwork();setBusy();});
-$('locate').addEventListener('click',locate);
 $('change-location').addEventListener('click',()=>{
   const editor=$('location-editor');editor.hidden=!editor.hidden;
   $('change-location').setAttribute('aria-expanded',String(!editor.hidden));
@@ -549,7 +531,7 @@ if(navigator.onLine === false){
   $('connection-status').textContent='Reconnect to refresh IP and ISP information.';
   $('scan-status').textContent='Offline · reconnect to discover servers.';
   status('Offline · view or export your saved flights below.');
-  window.addEventListener('online',()=>{connectionInfo();locate();},{once:true});
+  window.addEventListener('online',()=>{connectionInfo();discoverServers();},{once:true});
 }else{connectionInfo();}
 initializeLocation();
 

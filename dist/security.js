@@ -109,7 +109,7 @@ const OrbitSecurity = (() => {
     if(!/^[a-fA-F0-9:.]+$/.test(value) || !value.includes(':'))return false;
     try {return new URL(`https://[${value}]/`).hostname.startsWith('[');}catch{return false;}
   }
-  const recordKeys=new Set(['id','date','status','server','serverId','pings','download','upload','pingMs','jitterMs','downloadMbps','uploadMbps','finished','error','streams','measurementVersion','recoveryFrom','network']);
+  const recordKeys=new Set(['id','date','status','server','serverId','pings','download','upload','pingMs','jitterMs','downloadMbps','uploadMbps','finished','error','streams','profile','measurementVersion','recoveryFrom','network']);
   function validNetwork(n) {
     return n && typeof n==='object' && Object.keys(n).length===4 && Object.keys(n).every(k=>['type','source','effectiveType','saveData'].includes(k)) &&
       ['unknown','wifi','ethernet','cellular','3g','4g','5g','bluetooth','wimax','mixed','other','none'].includes(n.type) &&
@@ -120,6 +120,7 @@ const OrbitSecurity = (() => {
     if(!r || typeof r!=='object' || Object.keys(r).some(key=>!recordKeys.has(key)) || typeof r.id!=='string' || r.id.length>100 || typeof r.date!=='string' || !Number.isFinite(Date.parse(r.date)) || typeof r.server!=='string' || r.server.length>200 || !['running','failed','cancelled','complete'].includes(r.status))return false;
     if(r.network!==undefined && !validNetwork(r.network))return false;
     if(r.streams!==undefined && ![1,4].includes(r.streams))return false;
+    if(r.profile!==undefined && !['quick','sustained'].includes(r.profile))return false;
     if(r.measurementVersion!==undefined && r.measurementVersion!==2)return false;
     if(r.recoveryFrom!==undefined && (typeof r.recoveryFrom!=='string' || r.recoveryFrom.length>200))return false;
     if(r.serverId!==undefined && (typeof r.serverId!=='string' || r.serverId.length>100))return false;

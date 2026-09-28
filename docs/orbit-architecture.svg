@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1360" viewBox="0 0 1680 1360" role="img" aria-labelledby="title desc">
+<title id="title">Orbit Network Observatory — implementation architecture</title>
+<desc id="desc">GitHub Actions verifies the source and deploys static assets to GitHub Pages. In the user's browser, the interface connects to a measurement coordinator, derived measurement helpers, and IndexedDB history. Reviewed requests go directly to public speed-test servers, the LibreSpeed catalog, and Cloudflare or RIPEstat for identity. Browser location and network inputs stay local. A service worker caches only the app shell. Test traffic bypasses that cache.</desc>
+<defs>
+ <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0c121c"/><stop offset="1" stop-color="#0b0e13"/></linearGradient>
+ <linearGradient id="accent"><stop stop-color="#58ebd4"/><stop offset="1" stop-color="#7d9dff"/></linearGradient>
+ <marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto-start-reverse"><path d="M0 0 7 3.5 0 7Z" fill="#70b9ba"/></marker>
+ <marker id="muted-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto-start-reverse"><path d="M0 0 7 3.5 0 7Z" fill="#8391aa"/></marker>
+ <style>text{font-family:Inter,DejaVu Sans,Arial,sans-serif;fill:#edf2f8} .sub{fill:#aebdd0} .mono{font-family:DejaVu Sans Mono,monospace} .wire{fill:none;stroke:#70b9ba;stroke-width:2;stroke-linejoin:round;marker-end:url(#arrow)} .delivery{fill:none;stroke:#8391aa;stroke-width:2;marker-end:url(#muted-arrow)} .muted{fill:#90a1b9}</style>
+</defs>
+<rect width="1680" height="1360" rx="24" fill="url(#bg)"/>
+<rect x="48" y="130" width="1584" height="2" fill="#253342"/>
+
+<circle cx="76" cy="57" r="23" fill="#16242d" stroke="#64e6d4"/><ellipse cx="76" cy="57" rx="31" ry="11" fill="none" stroke="#729afa" transform="rotate(-32 76 57)"/><circle cx="102" cy="41" r="4" fill="#64e6d4"/>
+<text x="122" y="54" font-size="24" font-weight="700">ORBIT</text>
+<text x="122" y="78" font-size="11" fill="#94a9c8">NETWORK OBSERVATORY</text>
+<text x="48" y="113" font-size="28" font-weight="600">Implementation architecture</text>
+<text x="1020" y="58" font-size="13" fill="#9cabbf">BROWSER-BASED · LOCAL HISTORY · STATIC DELIVERY</text>
+<text x="1295" y="96" font-size="12" fill="#8f9eaf">SOURCE REVIEW · 27 SEP 2026</text>
+<rect x="48" y="170" width="282" height="136" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="48" y="190" width="3" height="96" rx="1.5" fill="#9dafc9"/>
+<text x="68" y="199" font-size="12" fill="#9dafc9" font-weight="600">01 / SOURCE</text>
+<text x="68" y="229" font-size="21" font-weight="600">GitHub repository</text>
+<text x="68" y="256" font-size="16" class="sub">HTML, CSS, vanilla JavaScript</text>
+<text x="68" y="281" font-size="16" class="sub">Tests + deployment workflow</text>
+<rect x="388" y="170" width="396" height="136" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="388" y="190" width="3" height="96" rx="1.5" fill="#9dafc9"/>
+<text x="408" y="199" font-size="12" fill="#9dafc9" font-weight="600">02 / VERIFY</text>
+<text x="408" y="229" font-size="21" font-weight="600">GitHub Actions</text>
+<text x="408" y="256" font-size="16" class="sub">npm run check  +  npm test</text>
+<text x="408" y="281" font-size="16" class="sub">Deploy dist/ only from main</text>
+<rect x="844" y="170" width="296" height="136" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="844" y="190" width="3" height="96" rx="1.5" fill="#9dafc9"/>
+<text x="864" y="199" font-size="12" fill="#9dafc9" font-weight="600">03 / SERVE</text>
+<text x="864" y="229" font-size="21" font-weight="600">GitHub Pages</text>
+<text x="864" y="256" font-size="16" class="sub">HTTPS static app assets</text>
+<text x="864" y="281" font-size="16" class="sub">No measurement backend</text>
+<rect x="1220" y="170" width="412" height="136" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="1220" y="190" width="3" height="96" rx="1.5" fill="#9dafc9"/>
+<text x="1240" y="199" font-size="12" fill="#9dafc9" font-weight="600">DEVELOPMENT ALTERNATIVE</text>
+<text x="1240" y="229" font-size="21" font-weight="600">Local preview</text>
+<text x="1240" y="256" font-size="16" class="sub">scripts/serve.mjs · localhost:8000</text>
+<text x="1240" y="281" font-size="16" class="sub">Loopback-only static file server</text>
+<path d="M330 237H388" class="delivery"/>
+<path d="M784 237H844" class="delivery"/>
+<path d="M992 306V386" class="delivery"/>
+<text x="1010" y="349" font-size="14" class="muted">app shell</text>
+<path d="M1415 306V350H1100V386" class="delivery" stroke-dasharray="7 6"/>
+<text x="1230" y="339" font-size="13" class="muted">localhost</text>
+<rect x="48" y="386" width="1100" height="780" rx="22" fill="#101822" stroke="#304757"/>
+<text x="80" y="422" font-size="12" fill="#66e9d6" font-weight="600">USER DEVICE</text>
+<text x="218" y="422" font-size="21" font-weight="600">Browser tab or installed PWA</text>
+<rect x="1210" y="386" width="422" height="780" rx="22" fill="#10161f" stroke="#304158" stroke-dasharray="7 6"/>
+<text x="1240" y="419" font-size="12" fill="#91b9ff" font-weight="600">EXTERNAL SERVICES</text>
+<text x="1240" y="443" font-size="16" class="sub">Direct HTTPS / CORS</text>
+<path d="M350 521H404" class="wire" marker-start="url(#arrow)"/>
+<path d="M788 521H842" class="wire" marker-start="url(#arrow)"/>
+<path d="M510 646V677H280V715" class="wire"/>
+<text x="360" y="668" font-size="13" class="muted">records</text>
+<path d="M146 715V606" class="wire"/>
+<text x="159" y="690" font-size="13" class="muted">derived values</text>
+<path d="M596 646V715" class="wire" marker-start="url(#arrow)"/>
+<text x="613" y="694" font-size="13" class="muted">save / load</text>
+<path d="M842 793H815V671H744V646" class="wire"/>
+<path d="M88 1035H65V561H88" class="wire" stroke-dasharray="7 6"/>
+<path d="M738 1035H842" class="wire" marker-start="url(#arrow)"/>
+<text x="752" y="1018" font-size="13" class="muted">shell</text>
+<path d="M1116 540H1180V542H1240" class="wire" marker-start="url(#arrow)"/>
+<path d="M1180 542V795H1240" class="wire"/>
+<path d="M1180 795V1053H1240" class="wire"/>
+<circle cx="1180" cy="542" r="3.5" fill="#70b9ba"/>
+<circle cx="1180" cy="795" r="3.5" fill="#70b9ba"/>
+<rect x="88" y="456" width="262" height="150" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="88" y="476" width="3" height="110" rx="1.5" fill="#64e6d4"/>
+<text x="108" y="485" font-size="12" fill="#64e6d4" font-weight="600">PRESENTATION</text>
+<text x="108" y="515" font-size="23" font-weight="600">Interface</text>
+<text x="108" y="542" font-size="16" class="sub">index.html · styles.css · ui.js</text>
+<text x="108" y="567" font-size="16" class="sub">Views, controls, live graphs</text>
+<text x="108" y="592" font-size="16" class="sub">JSON / CSV + clipboard</text>
+<rect x="404" y="456" width="384" height="190" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="404" y="476" width="3" height="150" rx="1.5" fill="#64e6d4"/>
+<text x="424" y="485" font-size="12" fill="#64e6d4" font-weight="600">COORDINATOR · APP.JS</text>
+<text x="424" y="515" font-size="21" font-weight="600">Measurement engine</text>
+<text x="424" y="542" font-size="16" class="sub">Discover and rank reachable servers</text>
+<text x="424" y="567" font-size="16" class="sub">Idle RTT → download → upload</text>
+<text x="424" y="592" font-size="16" class="sub">Parallel HTTP transfers + loaded RTT</text>
+<text x="424" y="617" font-size="16" class="sub">Retries, cancellation, attempt state</text>
+<rect x="842" y="456" width="274" height="190" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="842" y="476" width="3" height="150" rx="1.5" fill="#64e6d4"/>
+<text x="862" y="485" font-size="12" fill="#64e6d4" font-weight="600">APP.JS + SECURITY.JS</text>
+<text x="862" y="515" font-size="21" font-weight="600">Request boundary</text>
+<text x="862" y="542" font-size="16" class="sub">Reviewed endpoint URLs</text>
+<text x="862" y="567" font-size="16" class="sub">Bounded response bodies</text>
+<text x="862" y="592" font-size="16" class="sub">Timeout / abort · no redirects</text>
+<text x="862" y="617" font-size="16" class="sub">No credentials · no-store</text>
+<rect x="88" y="715" width="262" height="160" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="88" y="735" width="3" height="120" rx="1.5" fill="#64e6d4"/>
+<text x="108" y="744" font-size="12" fill="#64e6d4" font-weight="600">CORE.JS + TELEMETRY.JS</text>
+<text x="108" y="774" font-size="21" font-weight="600">Derived metrics</text>
+<text x="108" y="801" font-size="16" class="sub">Median, jitter, percentiles</text>
+<text x="108" y="826" font-size="16" class="sub">Readiness + loaded delta</text>
+<text x="108" y="851" font-size="16" class="sub">Distance + report formats</text>
+<rect x="404" y="715" width="384" height="160" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="404" y="735" width="3" height="120" rx="1.5" fill="#b5a3ff"/>
+<text x="424" y="744" font-size="12" fill="#b5a3ff" font-weight="600">LOCAL PERSISTENCE</text>
+<text x="424" y="774" font-size="21" font-weight="600">IndexedDB history</text>
+<text x="424" y="801" font-size="16" class="sub">orbit-speed-test / tests</text>
+<text x="424" y="826" font-size="16" class="sub">Completed + interrupted attempts</text>
+<text x="424" y="851" font-size="16" class="sub">Measurements, traces, access-type label</text>
+<rect x="842" y="715" width="274" height="160" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="842" y="735" width="3" height="120" rx="1.5" fill="#64e6d4"/>
+<text x="862" y="744" font-size="12" fill="#64e6d4" font-weight="600">BROWSER INPUTS</text>
+<text x="862" y="774" font-size="21" font-weight="600">Location &amp; access</text>
+<text x="862" y="801" font-size="16" class="sub">Geolocation + network API</text>
+<text x="862" y="826" font-size="16" class="sub">Timezone / manual fallback</text>
+<text x="862" y="851" font-size="16" class="sub">Context stays in tab memory</text>
+<text x="88" y="932" font-size="12" fill="#b5a3ff" font-weight="600">OFFLINE &amp; INSTALLATION</text>
+<rect x="88" y="967" width="650" height="150" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="88" y="987" width="3" height="110" rx="1.5" fill="#b5a3ff"/>
+<text x="108" y="996" font-size="12" fill="#b5a3ff" font-weight="600">PWA.JS · MANIFEST · SW.JS</text>
+<text x="108" y="1026" font-size="21" font-weight="600">Installable app + service worker</text>
+<text x="108" y="1053" font-size="16" class="sub">Register worker; cache exact same-origin GET shell assets</text>
+<text x="108" y="1078" font-size="16" class="sub">Offline history remains available; live tests require internet</text>
+<text x="108" y="1103" font-size="16" class="sub">Updates wait until all Orbit windows are closed</text>
+<rect x="842" y="967" width="274" height="150" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="842" y="987" width="3" height="110" rx="1.5" fill="#b5a3ff"/>
+<text x="862" y="996" font-size="12" fill="#b5a3ff" font-weight="600">CACHE STORAGE</text>
+<text x="862" y="1026" font-size="21" font-weight="600">Offline app shell</text>
+<text x="862" y="1053" font-size="16" class="sub">Versioned HTML / CSS / JS</text>
+<text x="862" y="1078" font-size="16" class="sub">Icons + bundled catalog</text>
+<text x="862" y="1103" font-size="16" class="sub">No external test traffic</text>
+<rect x="1240" y="476" width="364" height="140" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="1240" y="496" width="3" height="100" rx="1.5" fill="#8bb7ff"/>
+<text x="1260" y="505" font-size="12" fill="#8bb7ff" font-weight="600">SERVER DISCOVERY</text>
+<text x="1260" y="535" font-size="21" font-weight="600">LibreSpeed catalog</text>
+<text x="1260" y="562" font-size="16" class="sub">Live list + bundled servers.json</text>
+<text x="1260" y="587" font-size="16" class="sub">Catalogs cannot expand allowlist</text>
+<rect x="1240" y="715" width="364" height="174" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="1240" y="735" width="3" height="134" rx="1.5" fill="#8bb7ff"/>
+<text x="1260" y="744" font-size="12" fill="#8bb7ff" font-weight="600">MEASUREMENT TRAFFIC</text>
+<text x="1260" y="774" font-size="21" font-weight="600">Speed-test endpoints</text>
+<text x="1260" y="801" font-size="16" class="sub">LibreSpeed-compatible hosts:</text>
+<text x="1260" y="826" font-size="16" class="sub">Clouvider, Sharktech, community</text>
+<text x="1260" y="851" font-size="16" class="sub">Plus Cloudflare’s routed edge</text>
+<text x="1260" y="876" font-size="16" class="sub">HTTP RTT + download / upload</text>
+<rect x="1240" y="986" width="364" height="142" rx="18" fill="#141e28" stroke="#2b3949"/>
+<rect x="1240" y="1006" width="3" height="102" rx="1.5" fill="#8bb7ff"/>
+<text x="1260" y="1015" font-size="12" fill="#8bb7ff" font-weight="600">CURRENT CONNECTION IDENTITY</text>
+<text x="1260" y="1045" font-size="20" font-weight="600">Cloudflare + RIPEstat</text>
+<text x="1260" y="1072" font-size="16" class="sub">Public IP, ASN, network holder</text>
+<text x="1260" y="1097" font-size="16" class="sub">IP is sent to RIPEstat for lookup</text>
+<text x="88" y="1144" font-size="14" class="muted">Measurement helpers run in the page; the browser manages TCP / QUIC connections.</text>
+<rect x="48" y="1192" width="776" height="116" rx="16" fill="#151b26" stroke="#293646"/>
+<text x="72" y="1222" font-size="12" fill="#b5a3ff" font-weight="600">PERSISTENCE BOUNDARY</text>
+<text x="72" y="1249" font-size="16" class="sub">Saved history contains test results and an access-type snapshot.</text>
+<text x="72" y="1274" font-size="16" class="sub">Public IP, ASN, ISP and location are excluded from history and exports.</text>
+<rect x="850" y="1192" width="782" height="116" rx="16" fill="#151b26" stroke="#293646"/>
+<text x="874" y="1222" font-size="12" fill="#64e6d4" font-weight="600">MEASUREMENT CONTRACT</text>
+<text x="874" y="1249" font-size="16" class="sub">10 idle samples → download ≥22 s → upload ≥22 s; 1 or 4 HTTP streams.</text>
+<text x="874" y="1274" font-size="16" class="sub">Sustained Mbps = completed payload bits / full elapsed phase time.</text>
+<text x="48" y="1340" font-size="13" class="muted">Implementation view · arrows show principal data flows; see architecture.md for module responsibilities and trust boundaries.</text>
+<text x="1442" y="1340" font-size="13" class="muted">Developed by HigherIyer</text>
+</svg>
