@@ -25,6 +25,8 @@ assert.match(html, /id="profile-toggle"/);
 assert.match(html, /role="switch"/);
 assert.match(html, /id="unmask-ip"/);
 assert.match(html, /id="export-pdf"/);
+assert.match(html, /id="export-clean-markdown"/);
+assert.match(app, /function redactHistoryRecord/);
 assert.match(ui, /Orbit PDF downloaded/);
 assert.doesNotMatch(html, /rocket\.png|id="rocket"/);
 assert.match(html, /mechanical-progress/);

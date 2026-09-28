@@ -472,6 +472,8 @@ const OrbitUI = (() => {
     $("history").replaceChildren();
     $("history-count").textContent = String(records.length);
     $("export").disabled = !records.length;
+    $("export-clean-markdown").disabled = !records.length;
+    $("history-table-wrap").hidden = records.length === 0;
     $("history-empty").hidden = rows.length > 0;
     $("history-empty").querySelector("h3").textContent = records.length
       ? "No matching flights."
@@ -519,6 +521,12 @@ const OrbitUI = (() => {
         [record.uploadMbps, "violet"],
       ])
         tr.append(el("td", complete ? T.number(value) : "—", color));
+      const deltas=["download","upload"].map(direction=>{
+        const loaded=SpeedCore.median(record[direction]?.loadedPings || []);
+        return Number.isFinite(loaded) && Number.isFinite(record.pingMs) ? loaded-record.pingMs : null;
+      }).filter(Number.isFinite);
+      const grade=SpeedCore.bufferbloatGrade(deltas.length ? Math.max(...deltas) : null);
+      tr.append(el("td", complete && grade ? grade : "—", grade ? `buffer-grade grade-${grade.toLowerCase().replace('+','plus')}` : "buffer-grade"));
       tr.append(
         el(
           "td",
@@ -569,7 +577,7 @@ const OrbitUI = (() => {
           `Show more (${rows.length - page.length} remaining)`,
           "secondary",
         );
-      td.colSpan = 8;
+      td.colSpan = 9;
       more.addEventListener("click", () => {
         $("history").dataset.limit = String(page.length + 50);
         renderHistory(records);
@@ -726,6 +734,12 @@ const OrbitUI = (() => {
         JSON.stringify(api.getHistory(), null, 2),
         "application/json",
         `orbit-history-${new Date().toISOString().slice(0, 10)}.json`,
+      ),
+    );
+    $("export-clean-markdown").addEventListener("click", () =>
+      copy(
+        api.getHistory().map(T.markdown).filter(Boolean).join("\n\n---\n\n"),
+        "Clean Markdown archive",
       ),
     );
     $("copy-curl").addEventListener("click", () =>

@@ -592,6 +592,7 @@
               <p class="small">Your connection, over time.</p>
             </div>
             <button id="export" class="secondary">Export history</button>
+            <button id="export-clean-markdown" class="secondary">Export Clean Markdown</button>
           </div>
           <div class="history-tools">
             <label class="search-field"
@@ -610,7 +611,7 @@
               i
             </button>
           </div>
-          <div
+          <div id="history-table-wrap"
             class="table-wrap"
             role="region"
             aria-label="Saved flight results"
@@ -623,6 +624,7 @@
                   <th scope="col">Route</th>
                   <th scope="col">↓ Mbps</th>
                   <th scope="col">↑ Mbps</th>
+                  <th scope="col">Bufferbloat</th>
                   <th scope="col">Ping / jitter</th>
                   <th scope="col">Trace</th>
                   <th scope="col">Status</th>
@@ -633,7 +635,7 @@
             </table>
           </div>
           <div id="history-empty" class="empty-history">
-            <span aria-hidden="true">◴</span>
+            <span class="empty-history-badge" aria-hidden="true">∅</span>
             <h3>Your flight recorder is ready.</h3>
             <p>Completed, interrupted and cancelled tests appear here.</p>
           </div>

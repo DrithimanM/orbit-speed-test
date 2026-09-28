@@ -1228,6 +1228,8 @@ td {
   font-size: 11px;
   padding: 16px 13px;
   border-bottom: 1px solid #ffffff04;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 td:first-child,
 th:first-child {
@@ -1275,13 +1277,18 @@ td > small {
   text-align: center;
   padding: 44px 24px;
 }
-.empty-history > span {
+.empty-history-badge {
   display: inline-block;
-  font-size: 32px;
-  color: var(--cyan);
-  opacity: 0.7;
+  min-width: 34px;
+  padding: 6px 10px;
+  border: .5px solid var(--inlay-divider);
+  border-radius: 999px;
+  color: var(--champagne-gold);
+  font-size: 14px;
+  letter-spacing: .12em;
   margin-bottom: 12px;
 }
+.buffer-grade{font-weight:700;color:var(--steel-blue)}.grade-a,.grade-aplus{color:var(--status-emerald)}.grade-b{color:var(--champagne-gold)}.grade-c{color:var(--status-amber)}.grade-f{color:var(--status-crimson)}
 .empty-history h3 {
   font-size: 16px;
 }

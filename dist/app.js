@@ -448,6 +448,12 @@ async function startTest() {
 
 // IndexedDB avoids a fixed history-count cap. Quota errors are reported, never hidden.
 let dbPromise;
+function redactHistoryRecord(record) {
+  if(!record || typeof record!=='object')return record;
+  const safe={...record};
+  for(const key of ['ip','publicIP','publicIp','ipv4','ipv6'])delete safe[key];
+  return safe;
+}
 function database() {
   if(!dbPromise) dbPromise=new Promise((resolve,reject)=>{
     const req=indexedDB.open('orbit-speed-test',1);
@@ -461,7 +467,7 @@ async function loadHistory() {
   try {
     const db=await database();
     const previous=historyRecords;
-    historyRecords=await new Promise((resolve,reject)=>{const req=db.transaction('tests').objectStore('tests').getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+    historyRecords=(await new Promise((resolve,reject)=>{const req=db.transaction('tests').objectStore('tests').getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);})).map(redactHistoryRecord);
     const valid=historyRecords.filter(OrbitSecurity.validRecord);
     if(valid.length!==historyRecords.length)$('storage-status').textContent='Some invalid history entries were ignored. Stored data was not deleted.';
     // Keep attempts that may have started while the database read was pending.
@@ -475,6 +481,7 @@ async function loadHistory() {
 }
 async function saveRecord(record) {
   const index=historyRecords.findIndex(item=>item.id===record.id);
+  record=redactHistoryRecord(record);
   if(index===-1) historyRecords.push(record); else historyRecords[index]=record;
   try {
     const db=await database();
