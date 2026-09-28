@@ -69,6 +69,52 @@ const OrbitUI = (() => {
       "Speedtest uses Ookla’s host network. Fast.com tests against Netflix servers. Those independent services are useful comparisons; their servers and private APIs are not Orbit endpoints.",
     ],
   };
+  function currentMode() {
+    const sustained = $("profile-toggle")?.getAttribute("aria-checked") === "true";
+    const seconds = sustained ? 15 : 5;
+    const streams = Number($("stream-count")?.value) === 1 ? 1 : 3;
+    return { label: sustained ? "Deep Flight" : "Quick Probe", seconds, streams };
+  }
+  function infoLines(key) {
+    const mode = currentMode();
+    if (key === "measurement")
+      return [
+        `${mode.label}: ${mode.seconds} seconds per direction`,
+        `The active profile uses ${mode.seconds} seconds for download and ${mode.seconds} seconds for upload with ${mode.streams} concurrent reader${mode.streams === 1 ? "" : "s"}. Results divide transferred payload by full elapsed phase time, including stalls and retries.`,
+        "The shared planned-payload cap is 8 GB. Metadata and protocol overhead are outside that cap.",
+      ];
+    if (key === "streams")
+      return [
+        `${mode.streams}-reader ${mode.label} mode`,
+        mode.streams === 1
+          ? "This mode measures one browser-managed transfer worker. It is useful for comparing a low-concurrency route with the multi-reader mode."
+          : "Orbit takes a one-request baseline before stepping into three concurrent browser-managed readers. The efficiency value compares that baseline with sustained multi-reader throughput.",
+        "The browser may multiplex requests over TCP or QUIC, so reader count is not a guaranteed socket count.",
+      ];
+    if (key === "latency" && displayed?.pings?.length) {
+      const stats = T.stats(displayed).idle;
+      return [
+        `Idle HTTP RTT: ${T.number(stats.p50Ms)} ms P50`,
+        `This flight has ${stats.samples} idle samples: P95 is ${T.number(stats.p95Ms)} ms and P99 is ${T.number(stats.p99Ms)} ms. These are HTTP round trips to the selected endpoint, not ICMP ping.`,
+      ];
+    }
+    if (key === "bufferbloat" && displayed) {
+      const stats = T.stats(displayed);
+      const deltas = [stats.download.deltaMs, stats.upload.deltaMs].filter(Number.isFinite);
+      const delta = deltas.length ? Math.max(...deltas) : null;
+      const grade = SpeedCore.bufferbloatGrade(delta);
+      return [
+        delta === null ? "Loaded latency is pending" : `Loaded RTT: +${T.number(delta)} ms · Grade ${grade}`,
+        "Orbit samples HTTP RTT every 200 ms while traffic is active and compares the loaded median with the idle median. Endpoint scheduling can contribute to this result.",
+      ];
+    }
+    if (key === "readiness" && displayed?.status === "complete")
+      return [
+        "Readiness for this recorded flight",
+        ...SpeedCore.ratings(displayed).map((item) => `${item.name}: ${item.grade}. ${item.evidence}`),
+      ];
+    return infos[key] || ["Information", "No detail is available for this control."];
+  }
   const el = (tag, text, className) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -659,7 +705,7 @@ const OrbitUI = (() => {
     document.addEventListener("click", (event) => {
       const trigger = event.target.closest("[data-info]");
       if (trigger) {
-        openInfo(trigger, infos[trigger.dataset.info]);
+        openInfo(trigger, infoLines(trigger.dataset.info));
         return;
       }
       if (
