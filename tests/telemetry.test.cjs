@@ -123,6 +123,13 @@ test("the themed report preserves flight data and escapes record text", () => {
   assert.doesNotMatch(report, /<img src=x onerror/);
   assert.doesNotMatch(report, /Public IP:/);
 });
+test("the direct PDF export is a themed, self-contained PDF", () => {
+  const file = T.pdf(record);
+  assert.match(file, /^%PDF-1\.4/);
+  assert.match(file, /0\.043 0\.078 0\.149 rg/);
+  assert.match(file, /Flight report/);
+  assert.doesNotMatch(file, /window\.print|blob:/);
+});
 test("scrubbing returns measured samples only within the recorded range", () => {
   assert.equal(T.sampleAt(phase.points, 0.5), null);
   assert.equal(T.sampleAt(phase.points, 3), null);

@@ -24,7 +24,7 @@ assert.match(html, /id="profile-toggle"/);
 assert.match(html, /role="switch"/);
 assert.match(html, /id="unmask-ip"/);
 assert.match(html, /id="export-pdf"/);
-assert.match(ui, /Choose Save to PDF; enable Background graphics/);
+assert.match(ui, /Orbit PDF downloaded/);
 assert.doesNotMatch(html, /rocket\.png|id="rocket"/);
 assert.match(html, /mechanical-progress/);
 
