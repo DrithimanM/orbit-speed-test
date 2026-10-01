@@ -13,7 +13,7 @@ const OrbitUI = (() => {
   const infos = {
     measurement: [
       "Sustained, not a burst",
-      "Each transfer direction runs for at least 22 seconds. The result divides completed payload by total elapsed phase time, including stalls and retries. A full flight takes roughly a minute.",
+      "Each transfer direction schedules requests for 5 seconds in Quick Probe or 15 seconds in Sustained Flight, with up to 20 seconds for active requests to finish. The result divides completed payload by total elapsed phase time, including stalls and retries. Actual elapsed time depends on the network and retries.",
       "Tests can consume substantial data. The shared safety budget is up to 8 GB of planned payload; metadata and protocol overhead are additional. Use one stream for lower concurrency.",
     ],
     latency: [
@@ -35,7 +35,7 @@ const OrbitUI = (() => {
     ],
     streams: [
       "HTTP concurrency ≠ TCP connections",
-      "Orbit runs 1 or 4 concurrent HTTP transfer workers. The browser manages TCP/QUIC connections and may multiplex multiple requests over one connection. Connection counts, congestion control and transport protocol are not reliably exposed.",
+      "Orbit runs 1 or 3 concurrent HTTP transfer workers. The browser manages TCP/QUIC connections and may multiplex multiple requests over one connection. Connection counts, congestion control and transport protocol are not reliably exposed.",
       "Clouvider uploads are capped at 1 MB per request. Small requests on a long route may limit single-stream results.",
     ],
     endpoints: [
@@ -73,14 +73,14 @@ const OrbitUI = (() => {
     const sustained = $("profile-toggle")?.getAttribute("aria-checked") === "true";
     const seconds = sustained ? 15 : 5;
     const streams = Number($("stream-count")?.value) === 1 ? 1 : 3;
-    return { label: sustained ? "Deep Flight" : "Quick Probe", seconds, streams };
+    return { label: sustained ? "Sustained Flight" : "Quick Probe", seconds, streams };
   }
   function infoLines(key) {
     const mode = currentMode();
     if (key === "measurement")
       return [
         `${mode.label}: ${mode.seconds} seconds per direction`,
-        `The active profile uses ${mode.seconds} seconds for download and ${mode.seconds} seconds for upload with ${mode.streams} concurrent reader${mode.streams === 1 ? "" : "s"}. Results divide transferred payload by full elapsed phase time, including stalls and retries.`,
+        `The active profile schedules transfers for ${mode.seconds} seconds per direction with ${mode.streams} concurrent reader${mode.streams === 1 ? "" : "s"}. In-flight requests can extend a phase by up to 20 seconds. Results divide completed payload by full elapsed time, including stalls and retries.`,
         "The shared planned-payload cap is 8 GB. Metadata and protocol overhead are outside that cap.",
       ];
     if (key === "streams")
@@ -88,7 +88,7 @@ const OrbitUI = (() => {
         `${mode.streams}-reader ${mode.label} mode`,
         mode.streams === 1
           ? "This mode measures one browser-managed transfer worker. It is useful for comparing a low-concurrency route with the multi-reader mode."
-          : "Orbit takes a one-request baseline before stepping into three concurrent browser-managed readers. The efficiency value compares that baseline with sustained multi-reader throughput.",
+          : "Orbit takes a one-request baseline before stepping into three concurrent browser-managed readers. The ratio compares that short baseline with sustained throughput; it is not a transport efficiency score and may exceed 1×.",
         "The browser may multiplex requests over TCP or QUIC, so reader count is not a guaranteed socket count.",
       ];
     if (key === "latency" && displayed?.pings?.length) {
@@ -102,9 +102,9 @@ const OrbitUI = (() => {
       const stats = T.stats(displayed);
       const deltas = [stats.download.deltaMs, stats.upload.deltaMs].filter(Number.isFinite);
       const delta = deltas.length ? Math.max(...deltas) : null;
-      const grade = SpeedCore.bufferbloatGrade(delta);
+      const grade = SpeedCore.bufferbloatGrade(stats.gradeDeltaMs);
       return [
-        delta === null ? "Loaded latency is pending" : `Loaded RTT: +${T.number(delta)} ms · Grade ${grade}`,
+        delta === null ? "Loaded latency is pending" : `Loaded RTT: ${delta>=0?'+':''}${T.number(delta)} ms · ${grade ? 'Grade '+grade : 'Insufficient samples for a grade'}`,
         "Orbit samples HTTP RTT every 200 ms while traffic is active and compares the loaded median with the idle median. Endpoint scheduling can contribute to this result.",
       ];
     }
@@ -269,7 +269,7 @@ const OrbitUI = (() => {
       record?.download?.points || [],
       record?.upload?.points || [],
     ];
-    const maxX = Math.max(22, ...series.flat().map((p) => p.seconds)),
+    const maxX = Math.max(record?.profile==='sustained'?15:5, ...series.flat().map((p) => p.seconds)),
       maxY = Math.max(10, ...series.flat().map((p) => p.mbps)) * 1.12;
     const left = 38,
       right = width - 14,
@@ -372,7 +372,7 @@ const OrbitUI = (() => {
     ];
     $("chart-scrubber").disabled = !all.length;
     $("chart-scrubber").max = String(
-      Math.max(22, ...all.map((p) => p.seconds)),
+      Math.max(record?.profile==='sustained'?15:5, ...all.map((p) => p.seconds)),
     );
     $("trace-status").textContent = record
       ? `${all.length} interval samples · ${record.status === "complete" ? "complete flight" : "live / partial flight"} · Mbps`
@@ -485,7 +485,7 @@ const OrbitUI = (() => {
       "aria-label": `${record.download?.points?.length || 0} download and ${record.upload?.points?.length || 0} upload samples`,
     });
     const series = [record.download?.points || [], record.upload?.points || []];
-    const maxX = Math.max(22, ...series.flat().map((p) => p.seconds)),
+    const maxX = Math.max(record.profile==='sustained'?15:5, ...series.flat().map((p) => p.seconds)),
       maxY = Math.max(1, ...series.flat().map((p) => p.mbps));
     series.forEach((points, index) => {
       if (points.length)
@@ -567,11 +567,7 @@ const OrbitUI = (() => {
         [record.uploadMbps, "violet"],
       ])
         tr.append(el("td", complete ? T.number(value) : "—", color));
-      const deltas=["download","upload"].map(direction=>{
-        const loaded=SpeedCore.median(record[direction]?.loadedPings || []);
-        return Number.isFinite(loaded) && Number.isFinite(record.pingMs) ? loaded-record.pingMs : null;
-      }).filter(Number.isFinite);
-      const grade=SpeedCore.bufferbloatGrade(deltas.length ? Math.max(...deltas) : null);
+      const grade=SpeedCore.bufferbloatGrade(T.stats(record).gradeDeltaMs);
       tr.append(el("td", complete && grade ? grade : "—", grade ? `buffer-grade grade-${grade.toLowerCase().replace('+','plus')}` : "buffer-grade"));
       tr.append(
         el(

@@ -25,7 +25,7 @@ const server=http.createServer({maxHeaderSize:8192},async(req,res)=>{
   res.setHeader('X-Frame-Options','DENY');
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('Referrer-Policy','no-referrer');
-  res.setHeader('Permissions-Policy','geolocation=(self), camera=(), microphone=(), payment=(), usb=()');
+  res.setHeader('Permissions-Policy','geolocation=(), camera=(), microphone=(), payment=(), usb=()');
   res.setHeader('Cross-Origin-Opener-Policy','same-origin');
   res.setHeader('Cross-Origin-Resource-Policy','same-origin');
   res.setHeader('Cache-Control','no-store');

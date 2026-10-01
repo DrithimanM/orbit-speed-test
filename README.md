@@ -14,7 +14,7 @@ From this folder:
 npm start
 ```
 
-Open **http://localhost:8000**. Stop the server with **Ctrl+C**. Node.js 22+ and a modern browser are all you need. There are no packages to install and no build step. The local server includes security headers and serves only public assets.
+Open **http://localhost:8000**. Stop the server with **Ctrl+C**. Node.js 22+ and a modern browser are all you need. There are no runtime packages to install and no build step. Browser verification uses pinned development-only dependencies; see the release checks below. The local server includes security headers and serves only public assets.
 
 ## Install as an app
 
@@ -37,7 +37,7 @@ The site supplies PNG app icons, a 48 px PNG favicon fallback, a 180 px Apple to
 ## Use
 
 1. On load, Orbit looks up the network holder and probes a small reviewed server shortlist in parallel. It never requests device location. No full speed test starts automatically.
-2. Open the **Auto / route pill** to inspect edge RTT, filter operators, rescan, or choose a reachable endpoint. Four HTTP streams are the default; use the adjacent pill to switch to one.
+2. Open the **Auto / route pill** to inspect edge RTT, filter operators, rescan, or choose a reachable endpoint. Three HTTP streams are the default; use the adjacent pill to switch to one.
 3. Select **Quick Probe** (5 seconds per direction) or **Sustained Flight** (15 seconds per direction), then choose **Launch Test**. The visible data-use notice links to the shared 8 GB safety budget explanation. Cancel at any time.
 4. **Overview** shows the most recently inspected completed flight, readiness estimates, and the current/selected throughput trace. An interrupted flight keeps its partial trace and never receives a quality rating.
 5. **Telemetry & Nerd Stats** shows loaded RTT deltas, P50/P95/P99 idle latency, payload sizes, request/retry counters, access-type source, and reviewed endpoint paths. Hover the graph or use its keyboard/touch time slider to inspect actual samples. Lines connect measured intervals; they do not interpolate missing measurements.
@@ -50,21 +50,21 @@ The segmented control supports Left/Right, Home and End keys. Dialogs and info p
 
 ## Measurements and server discovery
 
-- The app measures ten HTTP ping samples after a warm-up. Ping is the median, and jitter is the mean absolute difference between consecutive samples. It is not ICMP ping.
-- Download and upload run for **5 seconds** each in Quick Probe or **15 seconds** each in Sustained Flight. Final Mbps = successfully completed payload bits / full elapsed phase time / 1,000,000. Time spent waiting or retrying remains in the denominator. Results are sustained averages, not peaks. Four streams share a phase clock; their rates are never added independently.
-- The trace updates from completed transfer data at least every 100 ms. Browser scheduling, server load, transport overhead, Wi-Fi, VPNs and distance affect it; it is not a packet-level link-rate capture.
-- An independent HTTP request samples latency roughly every 250 ms **during** each transfer phase. Median loaded RTT, its difference from idle median, idle P50/P95/P99, jitter, sample counts, retry counts and transferred payload are shown. These are end-to-end browser HTTP measurements including server scheduling. Missed probes are reported as missed HTTP probes, never as UDP packet loss. Actual game-server RTT and UDP packet loss are not measured.
-- Four concurrent HTTP transfers may multiplex over one HTTP/2 or HTTP/3 connection. They do not guarantee four distinct TCP connections or saturation of every connection. Compare modes on the same endpoint for useful results.
-- Data use can reach several GB. Each Launch Test invocation has a shared **8 GB planned-payload safety budget**, including transfer retries and recovery attempts. Startup discovery, metadata, headers and other transport overhead are outside that counter; it is not a billing guarantee. Cloudflare downloads are capped at **8,000,000 bytes per request**, below a reproduced 16 MB rejection. Other reviewed download endpoints retain a 16 MB request cap (LibreSpeed rounds to MiB); uploads cap at 8 MB, except **Clouvider uploads at 1,000,000 bytes** after a reproduced HTTP 413 above 1 MiB on Ashburn. Small HTTP payloads can constrain single-stream throughput on high-latency routes; compare 4-stream mode and other operators. Responses remain limited to 17 MiB. Every phase allows at most 1,000 transfer request attempts and 100 loaded-RTT outcomes.
-- Discovery uses the bundled reviewed catalog and Cloudflare fallback only. It sends one bounded edge-RTT request to each shortlisted candidate concurrently, with an 800 ms timeout, then ranks reachable endpoints by that RTT. **Server network** filters candidates before probing, including an option to exclude Cloudflare from measurements.
+- The app measures ten complete bounded HTTP GET ping samples after a GET warm-up, retaining every observed tail sample. Optional Resource Timing first-byte latency is shown only when the selected endpoint exposes detailed timing; it is not a pure wire or ICMP measurement. Ping is the median, and jitter is the mean absolute difference between consecutive samples. It is not ICMP ping.
+- Download and upload schedule transfers for **5 seconds** each in Quick Probe or **15 seconds** each in Sustained Flight. In-flight work can extend a phase; a shared deadline bounds the drain to a nominal 20 additional seconds, subject to browser scheduling. Final Mbps = successfully completed payload bits / full elapsed phase time / 1,000,000. Time spent waiting or retrying remains in the denominator. Results are sustained averages, not peaks. Three streams share a phase clock; their rates are never added independently.
+- The trace updates from completed transfer data approximately every 100 ms. Browser scheduling, server load, transport overhead, Wi-Fi, VPNs and distance affect it; it is not a packet-level link-rate capture.
+- An independent HTTP request samples latency with a 200 ms pause between probes **during** each transfer phase. Median loaded RTT, its difference from idle median, idle P50/P95/P99, jitter, sample counts, retry counts and transferred payload are shown. These are end-to-end browser HTTP measurements including server scheduling. Missed probes are reported as missed HTTP probes, never as UDP packet loss. Actual game-server RTT and UDP packet loss are not measured.
+- Three concurrent HTTP transfers may multiplex over one HTTP/2 or HTTP/3 connection. They do not guarantee three distinct TCP connections or saturation of every connection. Compare modes on the same endpoint for useful results.
+- Data use can reach several GB. Each Launch Test invocation has a shared **8 GB planned-payload safety budget**, including transfer retries and recovery attempts. Startup discovery, metadata, headers and other transport overhead are outside that counter; it is not a billing guarantee. Cloudflare downloads are capped at **8,000,000 bytes per request**, below a reproduced 16 MB rejection. Other reviewed download endpoints retain a 16 MB request cap (LibreSpeed rounds to MiB); uploads cap at 8 MB, except **Clouvider uploads at 1,000,000 bytes** after a reproduced HTTP 413 above 1 MiB on Ashburn. Small HTTP payloads can constrain single-stream throughput on high-latency routes; compare 3-stream mode and other operators. Responses remain limited to 17 MiB. Every phase allows at most 1,000 transfer request attempts and 100 loaded-RTT outcomes.
+- Discovery uses the bundled reviewed catalog and Cloudflare fallback only. It sends one bounded edge-RTT request to each shortlisted candidate concurrently, with an 800 ms timeout (up to eight candidates normally, or all reviewed candidates up to 40 in expanded mode), then ranks reachable endpoints by that RTT. **Server network** filters candidates before probing, including an option to exclude Cloudflare from measurements.
 - Cloudflare is an additional automatically routed endpoint and has no fixed distance. Its data-center code is displayed when exposed in response headers. Unavailable or browser-blocked servers are disabled.
-- Launch Test performs a larger preflight before timing. A failed transfer retries once at a smaller payload on the same endpoint. In **Automatic** mode, a failed attempt can restart the whole test on one other reachable endpoint. The UI announces the change and each attempt has its own history entry; results are never combined across endpoints. A manually selected endpoint never switches automatically. **Try another route** offers explicit recovery after a failure. Cancellation and safety-budget stops do not trigger automatic recovery.
+- Launch Test performs a larger preflight before timing. A failed transfer retries once at a smaller payload on the same endpoint. In **Automatic** mode, a failed attempt can restart the whole test on one other reachable endpoint. The UI announces the change and each attempt has its own history entry; results are never combined across endpoints. A manually selected endpoint never switches automatically. **Try another route** offers explicit recovery after a failure. Cancellation, HTTP 429 rate limits and safety-budget stops do not trigger automatic recovery. Authentication/permission failures, missing endpoints and rate limits are not immediately retried. A Web Locks guard prevents concurrent tests in cooperating tabs on supported browsers.
 
 ## Privacy and history
 
 - Orbit does not use the Geolocation API or request location permission. A route preference is a local, manual label only; it is never sent in requests or saved in history.
 - Page load automatically retrieves the server catalog and performs bounded discovery probes. This is separate from the sustained, potentially multi-GB test, which starts only when you press Launch Test. Timezone suggestions may be far from your actual location; the route dialog labels them explicitly and allows correction.
-- IP and ISP discovery runs on startup, manual refresh, and before a test when older than one minute. It uses Cloudflare response metadata with RIPEstat's [What's My IP](https://stat.ripe.net/docs/data-api/api-endpoints/whats-my-ip.html) fallback, followed by network-info and as-overview. Missing names and failed lookups have explicit states; refreshing clears stale identity. No API keys are required. Your public IP is sent to RIPEstat to identify the registered network holder. A VPN or upstream network may be shown instead of a retail ISP brand. Missing metadata does not prevent a test.
+- IP and ISP discovery runs on startup, manual refresh, and before a test when older than one minute. It uses Cloudflare response metadata with RIPEstat's [What's My IP](https://stat.ripe.net/docs/data-api/api-endpoints/whats-my-ip.html) fallback, followed by network-info and as-overview. Missing names and failed lookups have explicit states; refreshing clears stale identity. No API keys are required. RIPEstat requests include the sourceapp identifier orbit-speed-test and validate the API status envelope. Your public IP is sent to RIPEstat to identify the registered network holder. A VPN or upstream network may be shown instead of a retail ISP brand. Missing metadata does not prevent a test.
 - Test endpoints, the catalog host, and RIPEstat receive normal network request information including your public IP. Upload payloads are generated bytes, not personal files. No analytics are included.
 - IndexedDB saves each attempt when it starts and updates it on completion, failure, or cancellation. A tab closed mid-test leaves an unfinished entry. There is no arbitrary history-count limit, but browser storage quota/eviction still applies. Storage errors are shown with an export reminder.
 - History includes timestamps, server, status, measurements, graphs, and the access-type snapshot and source at test start; it does **not** store your location, public IP, ISP name or SSID. Tests taken before history was added are not recoverable. Clearing browser site data removes the saved history. Use export for a durable backup; history is specific to this browser and origin.
@@ -75,7 +75,7 @@ The [Network Information API](https://wicg.github.io/netinfo/) exposes an interf
 
 | Service | Test route | Useful comparison |
 | --- | --- | --- |
-| Orbit | Reviewed public LibreSpeed hosts and Cloudflare's routed edge | Select operator, endpoint and 1/4 HTTP streams; inspect sustained wall-time throughput and loaded RTT. |
+| Orbit | Reviewed public LibreSpeed hosts and Cloudflare's routed edge | Select operator, endpoint and 1/3 HTTP streams; inspect sustained wall-time throughput and loaded RTT. |
 | Speedtest by Ookla | Speedtest's host network, with nearby latency-based selection and manual choice | Compare an ISP-hosted route with independent paths. [Server selection](https://speedtest.zendesk.com/hc/en-us/articles/203845410-How-does-the-Begin-Test-button-select-a-server-) |
 | Fast.com | Downloads and uploads to Netflix servers | Compare your route to Netflix; Show more info includes loaded and unloaded latency. [Fast.com FAQ](https://fast.com/) |
 
@@ -126,3 +126,23 @@ After editing app assets, run `npm run cache:version`, then `npm run check` and 
 ## History compatibility
 
 New records use `measurementVersion: 2` and store the selected stream count, loaded RTT samples and diagnostic counters. Earlier records still load, are labelled as legacy single-flow measurements, and do not invent missing loaded-latency data. `transferMs` remains in exports for compatibility; in version 2 it contains elapsed phase wall time. No location or IP fields are added to records.
+
+## Release verification (2 October 2026)
+
+The local readiness audit and remaining launch gates are in [docs/launch-readiness.md](docs/launch-readiness.md). Preserve the dependency-free static runtime; development verification packages are never deployed.
+
+```bash
+npm ci --ignore-scripts
+npm run check:release
+npm run test:coverage
+npx --no-install playwright install chromium firefox webkit
+npm run test:release
+npm audit --audit-level=high
+npm run sbom
+```
+
+Browser release tests start an isolated local server, mock all public traffic, exercise the real engine, and cover three browser engines, offline history, tab locking, cancellation, mobile layouts and automated WCAG AA checks. Profile clocks are shortened in synthetic tests; physical-device timing and AAA accessibility still need manual verification. The targeted coverage gate measures the shared calculation, telemetry and validation modules, not complete browser/UI branch coverage.
+
+`node scripts/probe-endpoints.cjs --live` is an explicit, small GET-only CORS and download-contract smoke test from the configured origin. It never performs a full sustained test or upload and is never run in CI. Use only for ordinary endpoint checks; never load-test public operators.
+
+Measurement version 3 retains the existing history database and accepts versions 1/2, including unavailable legacy wire latency. Existing 4-stream history remains valid; current controls offer 1/3 streams. Old measurements are not silently relabelled as the new method.

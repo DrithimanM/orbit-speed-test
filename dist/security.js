@@ -109,7 +109,7 @@ const OrbitSecurity = (() => {
     if(!/^[a-fA-F0-9:.]+$/.test(value) || !value.includes(':'))return false;
     try {return new URL(`https://[${value}]/`).hostname.startsWith('[');}catch{return false;}
   }
-  const recordKeys=new Set(['id','date','status','server','serverId','pings','download','upload','pingMs','jitterMs','downloadMbps','uploadMbps','finished','error','streams','profile','measurementVersion','recoveryFrom','network','transport','singleMbps','efficiencyRatio','wireLatencyMs','appLatencyMs']);
+  const recordKeys=new Set(['id','date','status','server','serverId','pings','download','upload','pingMs','jitterMs','downloadMbps','uploadMbps','finished','error','streams','profile','measurementVersion','recoveryFrom','network','transport','singleMbps','efficiencyRatio','wireLatencyMs','appLatencyMs','httpTimingLatencyMs']);
   function validNetwork(n) {
     return n && typeof n==='object' && Object.keys(n).length===4 && Object.keys(n).every(k=>['type','source','effectiveType','saveData'].includes(k)) &&
       ['unknown','wifi','ethernet','cellular','3g','4g','5g','bluetooth','wimax','mixed','other','none'].includes(n.type) &&
@@ -124,19 +124,22 @@ const OrbitSecurity = (() => {
     if(r.transport!==undefined && !['h2','h3','http/1.1'].includes(r.transport))return false;
     if(r.singleMbps!==undefined && !finite(r.singleMbps))return false;
     if(r.efficiencyRatio!==undefined && (!finite(r.efficiencyRatio) || r.efficiencyRatio>100))return false;
-    if(r.wireLatencyMs!==undefined && !finite(r.wireLatencyMs))return false;
+    // Version 2 saved null when the former wire probe was unavailable.
+    if(r.wireLatencyMs!==undefined && r.wireLatencyMs!==null && !finite(r.wireLatencyMs))return false;
     if(r.appLatencyMs!==undefined && !finite(r.appLatencyMs))return false;
-    if(r.measurementVersion!==undefined && r.measurementVersion!==2)return false;
+    if(r.httpTimingLatencyMs!==undefined && r.httpTimingLatencyMs!==null && !finite(r.httpTimingLatencyMs))return false;
+    if(r.measurementVersion!==undefined && ![2,3].includes(r.measurementVersion))return false;
     if(r.recoveryFrom!==undefined && (typeof r.recoveryFrom!=='string' || r.recoveryFrom.length>200))return false;
     if(r.serverId!==undefined && (typeof r.serverId!=='string' || r.serverId.length>100))return false;
     if(r.finished!==undefined && (typeof r.finished!=='string' || !Number.isFinite(Date.parse(r.finished))))return false;
     if(!Array.isArray(r.pings) || r.pings.length>100 || !r.pings.every(finite))return false;
+    for(const field of ['pingMs','jitterMs','downloadMbps','uploadMbps'])if(r[field]!==undefined && !finite(r[field]))return false;
     for(const key of ['download','upload']){
       const data=r[key];if(data==null)continue;
       if(Object.keys(data).some(k=>!['bytes','durationMs','transferMs','mbps','points','loadedPings','probeFailures','requests','retries'].includes(k)))return false;
       if(data.loadedPings!==undefined && (!Array.isArray(data.loadedPings) || data.loadedPings.length>100 || !data.loadedPings.every(finite)))return false;
       for(const field of ['probeFailures','requests','retries'])if(data[field]!==undefined && (!Number.isSafeInteger(data[field]) || data[field]<0 || data[field]>1000))return false;
-      if(!finite(data.bytes)||!finite(data.durationMs)||!finite(data.transferMs)||!finite(data.mbps)||!Array.isArray(data.points)||data.points.length>1000||!data.points.every(p=>p && Object.keys(p).every(k=>['seconds','mbps'].includes(k)) && finite(p.seconds)&&finite(p.mbps)))return false;
+      if(!finite(data.bytes)||!finite(data.durationMs)||!finite(data.transferMs)||!finite(data.mbps)||!Array.isArray(data.points)||data.points.length>1000||!data.points.every((p,i)=>p && Object.keys(p).every(k=>['seconds','mbps'].includes(k)) && finite(p.seconds)&&finite(p.mbps) && (i===0 || p.seconds>=data.points[i-1].seconds)))return false;
     }
     if(r.status==='complete' && (!r.download || !r.upload || !['downloadMbps','uploadMbps','pingMs','jitterMs'].every(k=>finite(r[k]))))return false;
     return !r.error || (typeof r.error==='string' && r.error.length<1000);

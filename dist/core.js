@@ -38,7 +38,8 @@ const SpeedCore = (() => {
     const loads = ['download', 'upload'].flatMap(direction => {
       const samples = result[direction]?.loadedPings;
       const valid = Array.isArray(samples) ? samples.filter(n => Number.isFinite(n) && n >= 0) : [];
-      return valid.length >= 3 ? [{direction, delta: median(valid) - p, count: valid.length}] : [];
+      const baseline=result.pings?.length ? median(result.pings) : p;
+      return valid.length >= 3 ? [{direction, delta: median(valid) - baseline, count: valid.length}] : [];
     });
     const load = loads.sort((a, b) => b.delta - a.delta)[0];
     const congested = load?.delta >= 80;
@@ -218,3 +219,5 @@ const SpeedCore = (() => {
   const dialFraction = value => Number.isFinite(value) ? Math.min(1,Math.max(0,value)/1000) : 0;
   return {networkSnapshot, networkLabel, networkLabels, median, percentile, transferCap, jitter, distance, ratings, locations, validPoint, locationName, suggestedLocation, bufferbloatGrade, dialFraction};
 })();
+
+if(typeof module!=='undefined')module.exports=SpeedCore;

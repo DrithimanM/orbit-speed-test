@@ -29,7 +29,7 @@ function setProgress(value) {
 function setBusy() {
   const offline = navigator.onLine === false;
   const busy = offline || scanning || locating || Boolean(controller);
-  for (const id of ['start','scan','server-select','stream-count','server-scope','provider-filter','profile-toggle']) $(id).disabled = busy;
+  for (const id of ['start','scan','server-select','stream-count','server-scope','provider-filter','profile-toggle','retry']) $(id).disabled = busy;
   for (const id of ['location-choice','apply-location']) $(id).disabled = scanning || Boolean(controller);
   $('network-choice').disabled=Boolean(controller);
   $('refresh-connection').disabled=offline || Boolean(controller || metadataController);
@@ -65,37 +65,22 @@ async function request(url, options = {}, signal, timeout = 20000, asJson = fals
   if (!response.ok) {const error=new Error(`HTTP ${response.status} from ${new URL(safeURL).hostname}`);error.status=response.status;throw error;}
   const body = await OrbitSecurity.readBody(response,asJson ? 1048576 : 17*1048576,asJson);
   const entry=performance.getEntriesByName(safeURL).at(-1);
-  return {body, response, ms:Math.max(0.1,performance.now()-started), protocol:entry?.nextHopProtocol || null};
-}
-async function measureWireLatency() {
-  if(typeof RTCPeerConnection!=='function')return null;
-  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.cloudflare.com:3478'},{urls:'stun:stun.l.google.com:19302'}]});
-  let timer;
-  try {
-    pc.createDataChannel('latency-probe',{ordered:false,maxRetransmits:0});
-    await Promise.race([
-      (async()=>{await pc.setLocalDescription(await pc.createOffer());if(pc.iceGatheringState==='complete')return;await new Promise(resolve=>pc.addEventListener('icegatheringstatechange',()=>pc.iceGatheringState==='complete'&&resolve(),{once:true}));})(),
-      new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('STUN timeout')),1200);}),
-    ]);
-    const stats=await pc.getStats();
-    for(const stat of stats.values())if(stat.type==='candidate-pair'&&stat.state==='succeeded'&&Number.isFinite(stat.currentRoundTripTime))return Math.round(stat.currentRoundTripTime*1000);
-    return null;
-  }catch{return null;}finally{clearTimeout(timer);pc.close();}
+  // Detailed cross-origin timing is only usable when the provider exposes TAO.
+  const firstByteMs=entry?.requestStart>0 && entry.responseStart>=entry.requestStart ? entry.responseStart-entry.requestStart : null;
+  return {body, response, ms:Math.max(0.1,performance.now()-started), protocol:['h2','h3','http/1.1'].includes(entry?.nextHopProtocol) ? entry.nextHopProtocol : null, firstByteMs};
 }
 async function measureApplicationLatency(targetUrl, signal) {
-  const safeURL=OrbitSecurity.approvedURL(targetUrl,document.baseURI);
-  const probe=async method=>{
-    const started=performance.now();
-    const response=await fetch(safeURL,{method,cache:'no-store',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.any([...(signal?[signal]:[]),AbortSignal.timeout(5000)])});
-    if(!response.ok)throw new Error(`HTTP ${response.status}`);
-    await response.body?.cancel();
-    return Math.max(.1,performance.now()-started);
-  };
-  await probe('HEAD');
-  const samples=[];
-  for(let i=0;i<5;i++)samples.push(await probe('GET'));
-  samples.splice(samples.indexOf(Math.max(...samples)),1);
-  return {median:SpeedCore.median(samples),samples};
+  // Use the same bounded GET/body-consumption method as loaded probes. HEAD
+  // support is not part of the endpoint contract. Never trim observed tails.
+  const probe=()=>request(targetUrl,{},signal,5000);
+  await probe();
+  const samples=[],firstByteSamples=[];
+  for(let i=0;i<10;i++){
+    signal?.throwIfAborted();
+    const sample=await probe();samples.push(sample.ms);
+    if(Number.isFinite(sample.firstByteMs))firstByteSamples.push(sample.firstByteMs);
+  }
+  return {median:SpeedCore.median(samples),samples,firstByteMs:firstByteSamples.length===samples.length ? SpeedCore.median(firstByteSamples) : null};
 }
 function testURL(server, kind, bytes=0) {
   const cf = server.type === 'cloudflare';
@@ -139,7 +124,14 @@ async function connectionInfo(signal) {
   $('ip').textContent='Detecting…';$('isp').textContent='Looking up network…';$('asn').textContent='—';
   $('connection-status').textContent='Identifying the public connection via Cloudflare and RIPEstat…';setBusy();
   try {
-    const lookup = async (endpoint,resource) => (await request(`https://stat.ripe.net/data/${endpoint}/data.json${resource ? '?resource='+encodeURIComponent(resource) : ''}`,{},combined,5000,true)).body.data;
+    const lookup = async (endpoint,resource) => {
+      const url=new URL(`https://stat.ripe.net/data/${endpoint}/data.json`);
+      url.searchParams.set('sourceapp','orbit-speed-test');
+      if(resource)url.searchParams.set('resource',resource);
+      const result=(await request(url.href,{},combined,5000,true)).body;
+      if(result?.status!=='ok' || !result.data || typeof result.data!=='object')throw new Error('Network metadata unavailable');
+      return result.data;
+    };
     try {captureMetadata((await request(testURL(CF,'ping'),{},combined,4000)).response,next);} catch {combined.throwIfAborted();}
     if(!next.ip) {
       const ip=(await lookup('whats-my-ip'))?.ip;
@@ -239,17 +231,15 @@ async function discoverServers() {
     const expanded=$('server-scope').value==='all';
     // A small, simultaneous pool makes auto-lock responsive. Cloudflare remains
     // a deterministic fallback if no reviewed endpoint answers in the window.
-    servers=pool.slice(0,expanded ? 12 : 8);
-    if(!servers.some(server=>server.id==='cloudflare'))servers.unshift({...CF});
-    $('catalog-summary').textContent=`${candidates.length} reviewed endpoints + Cloudflare · ${servers.length} parallel edge probes`;
+    servers=pool.slice(0,expanded ? 40 : 8);
+    $('catalog-summary').textContent=`${pool.length} matching reviewed endpoints · ${servers.length} parallel edge probes`;
     await Promise.allSettled(servers.map(probe));
     servers.sort((a,b)=>(a.latency ?? Infinity)-(b.latency ?? Infinity));
     const valid = servers.filter(s=>s.available);
-    if(!valid.length){const fallback=servers.find(server=>server.id==='cloudflare')||{...CF};fallback.available=true;fallback.latency=null;servers=[fallback];}
     if (!valid.some(s=>s.id===selectedId)) selectedId='auto';
     renderServers();
     const best=servers.find(server=>server.available);
-    $('scan-status').textContent = best?.latency !== null ? `ARMED · ${best.name} · ${Math.round(best.latency)} ms edge RTT.` : 'ARMED · Cloudflare anycast fallback.';
+    $('scan-status').textContent = best ? `ARMED · ${best.name} · ${Math.round(best.latency)} ms HTTP RTT.` : 'No reachable endpoint matches this filter. Rescan or choose another network.';
   } catch {
     servers=[]; renderServers(); $('scan-status').textContent='Could not load the server catalog. Reload or try scanning again.';
   } finally { scanning=false; setBusy(); }
@@ -297,31 +287,32 @@ function delay(ms,signal) {
   });
 }
 function showDiagnostics(record) {
+  const baseline=record?.pings?.length ? SpeedCore.median(record.pings) : record?.pingMs;
   $('diag-state').textContent=record ? record.status==='complete' ? 'COMPLETE DATASET' : 'LIVE / PARTIAL DATA' : 'WAITING FOR SAMPLES';
   $('diag-network').textContent=SpeedCore.networkLabel(record?.network);
-  $('diag-mode').textContent=record ? `${record.streams || 1} HTTP stream${record.streams>1?'s':''}${record.measurementVersion===2?' · wall time':' · legacy'}` : 'Select a measurement mode';
+  $('diag-mode').textContent=record ? `${record.streams || 1} HTTP stream${record.streams>1?'s':''}${record.measurementVersion>=2?' · wall time':' · legacy'}` : 'Select a measurement mode';
   const protocol=record?.transport;
-  $('diag-transport').replaceChildren(document.createTextNode(protocol==='h3'?'HTTP/3 · QUIC / UDP':protocol==='h2'?'HTTP/2 · TCP / TLS':protocol?'HTTP '+protocol:'Browser managed'),node('span',protocol?'Observed with Resource Timing':'Protocol not exposed','sub-value'));
-  $('diag-efficiency').textContent=Number.isFinite(record?.efficiencyRatio) ? `${format(record.efficiencyRatio)}% · ${format(record.singleMbps)} Mbps one-request baseline` : record ? 'Needs a completed multi-stream flight' : 'Available after a completed flight';
+  $('diag-transport').replaceChildren(document.createTextNode(protocol==='h3'?'HTTP/3 · QUIC / UDP':protocol==='h2'?'HTTP/2 · TCP / TLS':protocol==='http/1.1'?'HTTP/1.1 · TCP / TLS':'Browser managed'),node('span',protocol?'Observed with Resource Timing':'Protocol not exposed','sub-value'));
+  $('diag-efficiency').textContent=Number.isFinite(record?.singleMbps) && record?.downloadMbps>0 ? `${format(record.singleMbps/record.downloadMbps)}× · ${format(record.singleMbps)} Mbps one-request baseline` : record ? 'Needs a completed downlink phase' : 'Available after a completed flight';
   $('diag-p95').textContent=record?.pings?.length ? `${format(SpeedCore.percentile(record.pings,.95))} ms · n=${record.pings.length}` : '—';
   for(const direction of ['download','upload']){
     const result=record?.[direction], values=result?.loadedPings || [];
     $('loaded-'+direction).textContent=values.length ? `${format(SpeedCore.median(values))} ms` : '—';
-    $('loaded-'+direction+'-detail').textContent=values.length ? `${record.pingMs===undefined ? 'Baseline pending' : `${SpeedCore.median(values)-record.pingMs>=0?'+':''}${format(SpeedCore.median(values)-record.pingMs)} ms vs idle`} · n=${values.length}` : 'HTTP RTT during transfer';
+    $('loaded-'+direction+'-detail').textContent=values.length ? `${!Number.isFinite(baseline) ? 'Baseline pending' : `${SpeedCore.median(values)-baseline>=0?'+':''}${format(SpeedCore.median(values)-baseline)} ms vs idle`} · n=${values.length}` : 'HTTP RTT during transfer';
   }
   const deltas=['download','upload'].map(direction=>{
     const values=record?.[direction]?.loadedPings || [];
-    return record?.pingMs!==undefined && values.length ? SpeedCore.median(values)-record.pingMs : null;
+    return Number.isFinite(baseline) && values.length ? SpeedCore.median(values)-baseline : null;
   }).filter(Number.isFinite);
   const delta=deltas.length ? Math.max(...deltas) : null;
-  const grade=SpeedCore.bufferbloatGrade(delta) || '—';
+  const grade=SpeedCore.bufferbloatGrade(OrbitTelemetry.stats(record).gradeDeltaMs) || '—';
   $('jitter').textContent=delta===null?'—':format(delta);
   $('buffer-detail').textContent=delta===null?'Grade — · loaded vs idle':`Grade ${grade} · ${delta>=0?'+':''}${format(delta)} ms loaded RTT`;
   const total=(record?.download?.bytes || 0)+(record?.upload?.bytes || 0);
   const requests=(record?.download?.requests || 0)+(record?.upload?.requests || 0);
   const retries=(record?.download?.retries || 0)+(record?.upload?.retries || 0);
-  $('diag-volume').textContent=record ? `${(total/1000000).toFixed(1)} MB · ${record.measurementVersion===2 ? requests+' requests' : 'legacy record'}` : '—';
-  $('diag-retries').textContent=record?.measurementVersion===2 ? `${retries} transfer retries · ${(record.download?.probeFailures || 0)+(record.upload?.probeFailures || 0)} missed RTT probes` : record ? 'Not recorded in legacy tests' : '—';
+  $('diag-volume').textContent=record ? `${(total/1000000).toFixed(1)} MB · ${record.measurementVersion>=2 ? requests+' requests' : 'legacy record'}` : '—';
+  $('diag-retries').textContent=record?.measurementVersion>=2 ? `${retries} transfer retries · ${(record.download?.probeFailures || 0)+(record.upload?.probeFailures || 0)} missed RTT probes` : record ? 'Not recorded in legacy tests' : '—';
   OrbitUI.renderTelemetry(record);
 }
 function reservePayload(run,bytes) {
@@ -333,7 +324,8 @@ async function bandwidth(server,direction,record,run) {
   const payload=direction==='upload' ? new Uint8Array(cap) : null;
   if(payload)for(let offset=0;offset<payload.length;offset+=65536)crypto.getRandomValues(payload.subarray(offset,Math.min(offset+65536,payload.length)));
   const result={bytes:0,transferMs:0,durationMs:0,mbps:0,points:[],loadedPings:[],probeFailures:0,requests:0,retries:0};record[direction]=result;
-  const local=new AbortController(), signal=AbortSignal.any([controller.signal,local.signal]);
+  // Stop scheduling at the target; allow a bounded drain for in-flight work.
+  const local=new AbortController(), signal=AbortSignal.any([controller.signal,local.signal,AbortSignal.timeout(run.durationMs+20000)]);
   const started=performance.now();let lastSample=0,lastBytes=0,firstError;
   updateDial();phase(direction,direction==='download' ? 'DOWNLINK ACTIVE' : 'UPLINK ACTIVE');
   const update=(final=false)=>{
@@ -373,11 +365,11 @@ async function bandwidth(server,direction,record,run) {
         try {
           response=await request(testURL(server,direction,size),direction==='upload' ? {method:'POST',body:payload.subarray(0,size),headers:{'Content-Type':'text/plain'}} : {},signal);
           if(direction==='download'){
-            if(!response.response.headers.get('content-type')?.includes('application/octet-stream') || !response.body.byteLength || (server.type==='cloudflare' && response.body.byteLength!==size))throw new Error('Invalid or incomplete download payload');
+            if(!response.response.headers.get('content-type')?.toLowerCase().includes('application/octet-stream') || response.body.byteLength!==planned)throw new Error('Invalid or incomplete download payload');
           }
           break;
         }catch(error){
-          if(signal.aborted || attempt || error.code==='LIMIT')throw error;
+          if(signal.aborted || attempt || error.code==='LIMIT' || [401,403,404,429].includes(error.status))throw error;
           result.retries++;size=Math.max(65536,Math.floor(size/2));await delay(200,signal);
         }
       }
@@ -393,7 +385,7 @@ async function bandwidth(server,direction,record,run) {
     await Promise.all(workers);
     if(firstError)throw firstError;
     update(true);return result;
-  }finally{clearInterval(ticker);local.abort();await monitor;}
+  }finally{clearInterval(ticker);local.abort();await monitor;update(true);}
 }
 function endpointLabel(server) {
   return server.type==='cloudflare' && connection.colo ? `Cloudflare · ${connection.colo==='DXB' ? 'Dubai (DXB)' : connection.colo}` : server.name;
@@ -405,7 +397,7 @@ function failureMessage(error,server,stage) {
   return `${stage} at ${host}: ${reason}.`;
 }
 async function testAttempt(server,run,recoveryFrom) {
-  const record={id:crypto.randomUUID(),date:new Date().toISOString(),status:'running',server:server.name,serverId:server.id,pings:[],download:null,upload:null,streams:run.streams,profile:run.profile,measurementVersion:2,network:currentNetwork()};
+  const record={id:crypto.randomUUID(),date:new Date().toISOString(),status:'running',server:server.name,serverId:server.id,pings:[],download:null,upload:null,streams:run.streams,profile:run.profile,measurementVersion:3,network:currentNetwork()};
   if(recoveryFrom)record.recoveryFrom=recoveryFrom;
   current=record;let stage='Preflight';
   for(const id of ['download','upload','ping','jitter','live-value'])$(id).textContent='—';
@@ -424,13 +416,13 @@ async function testAttempt(server,run,recoveryFrom) {
     if(preflight.body.byteLength<1048576 || !preflight.response.headers.get('content-type')?.includes('application/octet-stream'))throw new Error('Endpoint did not return test data');
     await request(testURL(server,'upload'),{method:'POST',body:new Uint8Array(262144),headers:{'Content-Type':'text/plain'}},controller.signal,10000);
     stage='Idle latency';phase('ping','WARMING APPLICATION PATH');
-    const [wireLatency,applicationLatency]=await Promise.all([measureWireLatency(),measureApplicationLatency(testURL(server,'ping'),controller.signal)]);
-    record.pings=applicationLatency.samples;record.appLatencyMs=applicationLatency.median;record.wireLatencyMs=wireLatency;
-    record.pingMs=wireLatency ?? applicationLatency.median;record.jitterMs=SpeedCore.jitter(record.pings);
-    $('ping').textContent=format(record.pingMs);$('jitter').textContent=format(SpeedCore.jitter(record.pings));
-    $('ping-detail').textContent=wireLatency===null ? `App RTT ${format(applicationLatency.median)} ms · wire probe unavailable` : `Wire ${wireLatency} ms · App RTT ${format(applicationLatency.median)} ms`;
+    const applicationLatency=await measureApplicationLatency(testURL(server,'ping'),controller.signal);
+    record.pings=applicationLatency.samples;record.appLatencyMs=applicationLatency.median;record.httpTimingLatencyMs=applicationLatency.firstByteMs;
+    record.pingMs=applicationLatency.median;record.jitterMs=SpeedCore.jitter(record.pings);
+    $('ping').textContent=format(record.pingMs);
+    $('ping-detail').textContent=`HTTP RTT ${format(record.pingMs)} ms · ${record.pings.length} samples${record.httpTimingLatencyMs===null ? '' : ` · first byte ${format(record.httpTimingLatencyMs)} ms`}`;
     $('live-value').textContent=$('ping').textContent;updateDial(record.pingMs,'ms');setProgress(5);drawPings(record.pings);showDiagnostics(record);
-    stage='Download';record.downloadMbps=(await bandwidth(server,'download',record,run)).mbps;record.efficiencyRatio=record.streams===3 ? Math.min(100,record.singleMbps/record.downloadMbps*100) : 100;
+    stage='Download';record.downloadMbps=(await bandwidth(server,'download',record,run)).mbps;
     stage='Upload';record.uploadMbps=(await bandwidth(server,'upload',record,run)).mbps;
     record.status='complete';record.server=endpointLabel(server);$('server').textContent=record.server;
     setProgress(100);phase(null,'MISSION COMPLETE');$('live-value').textContent=format(record.downloadMbps);updateDial(record.downloadMbps);$('live-label').textContent=`${run.profile==='quick'?'Quick':'Sustained'} downlink average`;
@@ -443,6 +435,7 @@ async function testAttempt(server,run,recoveryFrom) {
     status(`${record.error} Partial data is labelled below; no quality rating assigned.`);
     for(const id of ['download','upload','ping','jitter','live-value'])$(id).textContent='—';
     for(const id of ['download','upload'])$(`${id}-detail`).textContent='Incomplete · partial trace';
+    if(error.status===429)run.stopped=true;
     if(record.status==='failed' && !run.stopped){server.available=false;server.latency=null;}
   }finally{
     record.finished=new Date().toISOString();showDiagnostics(record);await saveRecord(record);
@@ -450,6 +443,15 @@ async function testAttempt(server,run,recoveryFrom) {
   return record;
 }
 async function startTest() {
+  if(navigator.locks?.request){
+    return navigator.locks.request('orbit-speed-test:measurement',{ifAvailable:true},lock=>{
+      if(!lock){status('A test is running in another Orbit tab. Finish or cancel it before starting here.');return {error:'Another tab is measuring'};}
+      return startTestUnlocked();
+    });
+  }
+  return startTestUnlocked();
+}
+async function startTestUnlocked() {
   if(navigator.onLine === false){status('Reconnect to run a speed test. Saved flights are available below.');return {error:'Offline'};}
   if(EMBEDDED || controller || scanning || locating)return {error:'Another operation is running.'};
   if(!servers.length)await discoverServers();
@@ -477,6 +479,17 @@ async function startTest() {
 
 // IndexedDB avoids a fixed history-count cap. Quota errors are reported, never hidden.
 let dbPromise;
+const STORAGE_TIMEOUT_MS=3000;
+function storageTransaction(db,mode,action) {
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction('tests',mode);let value;
+    const timer=setTimeout(()=>{tx.abort();reject(new Error('History storage timed out'));},STORAGE_TIMEOUT_MS);
+    tx.oncomplete=()=>{clearTimeout(timer);resolve(value);};
+    tx.onerror=tx.onabort=()=>{clearTimeout(timer);reject(tx.error || new Error('History storage interrupted'));};
+    try {const req=action(tx.objectStore('tests'));req.onsuccess=()=>{value=req.result;};}
+    catch(error){clearTimeout(timer);tx.abort();reject(error);}
+  });
+}
 function redactHistoryRecord(record) {
   if(!record || typeof record!=='object')return record;
   const safe={...record};
@@ -486,17 +499,24 @@ function redactHistoryRecord(record) {
 function database() {
   if(!dbPromise) dbPromise=new Promise((resolve,reject)=>{
     const req=indexedDB.open('orbit-speed-test',1);
+    let settled=false;
+    const timer=setTimeout(()=>{settled=true;reject(new Error('History storage timed out'));},STORAGE_TIMEOUT_MS);
     req.onupgradeneeded=()=>req.result.createObjectStore('tests',{keyPath:'id'});
-    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
-    req.onblocked=()=>reject(new Error('History database is blocked by another tab.'));
-  });
+    req.onsuccess=()=>{
+      clearTimeout(timer);
+      if(settled){req.result.close();return;}
+      settled=true;req.result.onversionchange=()=>{req.result.close();dbPromise=null;};resolve(req.result);
+    };
+    req.onerror=()=>{clearTimeout(timer);settled=true;reject(req.error);};
+    req.onblocked=()=>{clearTimeout(timer);settled=true;reject(new Error('History database is blocked by another tab.'));};
+  }).catch(error=>{dbPromise=null;throw error;});
   return dbPromise;
 }
 async function loadHistory() {
   try {
     const db=await database();
     const previous=historyRecords;
-    historyRecords=(await new Promise((resolve,reject)=>{const req=db.transaction('tests').objectStore('tests').getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);})).map(redactHistoryRecord);
+    historyRecords=(await storageTransaction(db,'readonly',store=>store.getAll())).map(redactHistoryRecord);
     const valid=historyRecords.filter(OrbitSecurity.validRecord);
     if(valid.length!==historyRecords.length)$('storage-status').textContent='Some invalid history entries were ignored. Stored data was not deleted.';
     // Keep attempts that may have started while the database read was pending.
@@ -514,7 +534,7 @@ async function saveRecord(record) {
   if(index===-1) historyRecords.push(record); else historyRecords[index]=record;
   try {
     const db=await database();
-    await new Promise((resolve,reject)=>{const tx=db.transaction('tests','readwrite');tx.objectStore('tests').put(record);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+    await storageTransaction(db,'readwrite',store=>store.put(record));
   } catch {$('storage-status').textContent='This result could not be saved. Browser storage may be full or blocked. Export history before leaving.';}
   renderHistory();
 }
@@ -524,8 +544,9 @@ function viewRecord(record) {
   const completed=record.status==='complete';
   current=record;drawSpeed(record);drawPings(record.pings);showRatings(record);showDiagnostics(record);
   $('route-note').textContent='Saved measurement · '+record.server;
-  for(const [id,key] of [['download','downloadMbps'],['upload','uploadMbps'],['ping','pingMs'],['jitter','jitterMs']])$(id).textContent=completed ? format(record[key]):'—';
+  for(const [id,key] of [['download','downloadMbps'],['upload','uploadMbps'],['ping','pingMs']])$(id).textContent=completed ? format(record[key]):'—';
   for(const direction of ['download','upload'])$(`${direction}-detail`).textContent=completed ? `${(record[direction].durationMs/1000).toFixed(1)} s · ${(record[direction].bytes/1000000).toFixed(0)} MB`:'Incomplete · partial trace';
+  $('ping-detail').textContent=completed ? `Saved HTTP RTT · ${record.pings.length} samples${record.measurementVersion===3?'':' · legacy method'}` : 'Incomplete latency measurement';
   $('server').textContent=record.server;$('live-value').textContent=completed ? format(record.downloadMbps):'—';$('live-unit').textContent='Mbps';$('flight-time').textContent='SAVED FLIGHT';
   updateDial(completed ? record.downloadMbps : 0);phase(null,'RECORDED FLIGHT');
   $('live-label').textContent=completed ? 'Download · sustained average' : 'Incomplete measurement';

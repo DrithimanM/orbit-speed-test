@@ -8,9 +8,21 @@
     "test:browser": "node tests/browser-ui.cjs",
     "check": "node --check dist/security.js && node --check dist/core.js && node --check dist/telemetry.js && node --check dist/ui.js && node --check dist/app.js && node --check scripts/serve.mjs && node --check dist/pwa.js && node --check dist/sw.js && node scripts/version-shell.mjs --check",
     "start": "node scripts/serve.mjs",
-    "cache:version": "node scripts/version-shell.mjs"
+    "cache:version": "node scripts/version-shell.mjs",
+    "test:release": "node tests/browser-release.cjs",
+    "test:coverage": "node --experimental-test-coverage --test --test-concurrency=1 tests/*.test.cjs",
+    "audit:assets": "node scripts/audit-assets.mjs",
+    "sbom": "node scripts/sbom.mjs",
+    "check:release": "node scripts/verify.mjs"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "playwright": "1.62.1"
+  },
+  "overrides": {
+    "playwright-core": "1.62.1"
   }
 }

@@ -1,7 +1,7 @@
 flowchart TB
   subgraph Delivery["Static delivery"]
     direction LR
-    Repo["GitHub repository"] --> CI["GitHub Actions<br/>npm run check + npm test"]
+    Repo["GitHub repository"] --> CI["GitHub Actions<br/>Unit + browser + security gates"]
     CI -->|"main only · dist artifact"| Pages["GitHub Pages · HTTPS"]
     Local["Optional local preview<br/>scripts/serve.mjs · localhost:8000"]
   end
@@ -12,7 +12,7 @@ flowchart TB
     App["Coordinator + measurement engine · app.js<br/>Discovery, metadata, test phases, retries and history"]
     Calc["Derived measurements · core.js + telemetry.js<br/>Statistics, distance, readiness, diagnostics and serialization"]
     Gate["Request boundary · app.js request() + security.js<br/>Reviewed URLs, bounded bodies, timeout and cancellation"]
-    Inputs["Browser inputs<br/>Geolocation, network information, timezone / manual fallback"]
+    Inputs["Browser inputs<br/>Network information + manual city preference"]
     History[("IndexedDB · orbit-speed-test / tests<br/>Attempt status, measurements, traces and access-type snapshot")]
     PWA["Installation + updates · pwa.js<br/>manifest.webmanifest + icons"]
     SW["Service worker · sw.js<br/>Exact same-origin GET shell assets only"]
@@ -32,7 +32,7 @@ flowchart TB
   end
 
   subgraph Remote["Third-party services · direct browser HTTPS / CORS"]
-    Catalog["LibreSpeed live catalog<br/>Merged with bundled catalog; allowlist still applies"]
+    Catalog["Bundled reviewed catalog<br/>Same-origin asset; fixed endpoint allowlist"]
     Endpoints["Reviewed speed-test endpoints<br/>LibreSpeed: Clouvider, Sharktech, community / research<br/>Cloudflare routed edge"]
     Identity["Connection identity<br/>Cloudflare response metadata + RIPEstat<br/>Public IP, ASN and registered network holder"]
   end
@@ -40,7 +40,7 @@ flowchart TB
   Pages -->|"HTML, CSS, scripts and assets"| UI
   Pages -.->|"app-shell installation / update"| SW
   Local -.->|"development alternative"| UI
-  Gate <-->|"catalog JSON"| Catalog
+  Cache -.->|"reviewed bundled catalog"| Catalog
   Gate <-->|"HTTP RTT + download / upload payloads"| Endpoints
   Gate <-->|"IP / ASN lookup"| Identity
 
