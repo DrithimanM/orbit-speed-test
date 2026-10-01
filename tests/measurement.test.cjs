@@ -83,7 +83,9 @@ test('request boundary handles timeout and cancellation without leaking credenti
     assert.equal(options.credentials,'omit');assert.equal(options.redirect,'error');assert.equal(options.referrerPolicy,'no-referrer');assert.equal(options.cache,'no-store');
     options.signal.addEventListener('abort',()=>reject(options.signal.reason),{once:true});
   })});
-  await assert.rejects(h.ctx.request('https://speed.cloudflare.com/__down?bytes=0',{},undefined,20),{name:'TimeoutError'});
+  // Node's AbortSignal.timeout timer is unref'ed; the mocked fetch has no real socket.
+  const keepAlive=setInterval(()=>{},1000);
+  try {await assert.rejects(h.ctx.request('https://speed.cloudflare.com/__down?bytes=0',{},undefined,20),{name:'TimeoutError'});}finally{clearInterval(keepAlive);}
   const controller=new AbortController();const promise=h.ctx.request('https://speed.cloudflare.com/__down?bytes=0',{},controller.signal,1000);controller.abort();await assert.rejects(promise,{name:'AbortError'});
 });
 test('storage failure retains exportable session history and resets failed database handles',async()=>{
