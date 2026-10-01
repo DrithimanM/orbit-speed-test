@@ -2,17 +2,8 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const context = vm.createContext({
-  URL,
-  OrbitSecurity: require("../dist/security.js"),
-});
-vm.runInContext(
-  fs.readFileSync("dist/core.js", "utf8") +
-    "\n" +
-    fs.readFileSync("dist/telemetry.js", "utf8"),
-  context,
-);
-const T = vm.runInContext("OrbitTelemetry", context);
+const context={OrbitSecurity:require('../dist/security.js')};
+const T=require('../dist/telemetry.js');
 const catalog = JSON.parse(fs.readFileSync("dist/servers.json", "utf8"));
 const phase = {
   bytes: 1000000,
@@ -141,4 +132,20 @@ test("scrubbing returns measured samples only within the recorded range", () => 
   assert.equal(T.sampleAt(phase.points, 3), null);
   assert.equal(T.sampleAt(phase.points, 1.8).mbps, 8);
   assert.equal(T.sampleAt([], 1), null);
+});
+test('sparse loaded probes remain visible but cannot earn a quality grade',()=>{
+  assert.equal(T.stats(record).gradeDeltaMs,null);
+  const sufficient={...record,download:{...phase,loadedPings:[8,10,12]},upload:{...phase,loadedPings:[1000]}};
+  assert.equal(T.stats(sufficient).gradeDeltaMs,null);
+  assert.match(T.markdown(sufficient),/Grade —/);
+  assert.equal(T.stats({...sufficient,upload:{...phase,loadedPings:[]}}).gradeDeltaMs,-15);
+});
+test('Markdown marks partial results and neutralizes embedded HTML and line injection',()=>{
+  const report=T.markdown({...record,status:'cancelled',server:'<img src=x>\n### injected'});
+  assert.match(report,/Status:\*\* Cancelled/);assert.match(report,/partial measurement/);assert.doesNotMatch(report,/<img|\n### injected|\+\-/);assert.match(report,/Downlink:\*\* —/);
+});
+test('partial HTML and PDF exports never promote finished phases to a complete-flight headline',()=>{
+  const partial={...record,status:'failed',downloadMbps:123.45};
+  assert.match(T.report(partial),/Incomplete flight/);assert.doesNotMatch(T.report(partial),/123\.5/);
+  assert.match(T.pdf(partial),/Incomplete flight/);assert.doesNotMatch(T.pdf(partial),/123\.5/);
 });

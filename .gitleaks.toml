@@ -1,0 +1,5 @@
+[extend]
+useDefault = true
+[[allowlists]]
+description = "Generated verification evidence and installed development packages"
+paths = ['''(^|/)(node_modules|coverage)(/|$)''']

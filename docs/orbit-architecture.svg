@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1360" viewBox="0 0 1680 1360" role="img" aria-labelledby="title desc">
 <title id="title">Orbit Network Observatory — implementation architecture</title>
-<desc id="desc">GitHub Actions verifies the source and deploys static assets to GitHub Pages. In the user's browser, the interface connects to a measurement coordinator, derived measurement helpers, and IndexedDB history. Reviewed requests go directly to public speed-test servers, the LibreSpeed catalog, and Cloudflare or RIPEstat for identity. Browser location and network inputs stay local. A service worker caches only the app shell. Test traffic bypasses that cache.</desc>
+<desc id="desc">GitHub Actions verifies the source and deploys static assets to GitHub Pages. In the user's browser, the interface connects to a measurement coordinator, derived measurement helpers, and IndexedDB history. Reviewed requests go directly to public speed-test servers, and Cloudflare or RIPEstat for identity. Manual city and network inputs stay local. A service worker caches only the app shell. Test traffic bypasses that cache.</desc>
 <defs>
  <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0c121c"/><stop offset="1" stop-color="#0b0e13"/></linearGradient>
  <linearGradient id="accent"><stop stop-color="#58ebd4"/><stop offset="1" stop-color="#7d9dff"/></linearGradient>
@@ -27,7 +27,7 @@
 <rect x="388" y="190" width="3" height="96" rx="1.5" fill="#9dafc9"/>
 <text x="408" y="199" font-size="12" fill="#9dafc9" font-weight="600">02 / VERIFY</text>
 <text x="408" y="229" font-size="21" font-weight="600">GitHub Actions</text>
-<text x="408" y="256" font-size="16" class="sub">npm run check  +  npm test</text>
+<text x="408" y="256" font-size="16" class="sub">npm run check:release</text>
 <text x="408" y="281" font-size="16" class="sub">Deploy dist/ only from main</text>
 <rect x="844" y="170" width="296" height="136" rx="18" fill="#141e28" stroke="#2b3949"/>
 <rect x="844" y="190" width="3" height="96" rx="1.5" fill="#9dafc9"/>
@@ -111,8 +111,8 @@
 <rect x="842" y="735" width="3" height="120" rx="1.5" fill="#64e6d4"/>
 <text x="862" y="744" font-size="12" fill="#64e6d4" font-weight="600">BROWSER INPUTS</text>
 <text x="862" y="774" font-size="21" font-weight="600">Location &amp; access</text>
-<text x="862" y="801" font-size="16" class="sub">Geolocation + network API</text>
-<text x="862" y="826" font-size="16" class="sub">Timezone / manual fallback</text>
+<text x="862" y="801" font-size="16" class="sub">Manual city + network API</text>
+<text x="862" y="826" font-size="16" class="sub">Timezone / manual region</text>
 <text x="862" y="851" font-size="16" class="sub">Context stays in tab memory</text>
 <text x="88" y="932" font-size="12" fill="#b5a3ff" font-weight="600">OFFLINE &amp; INSTALLATION</text>
 <rect x="88" y="967" width="650" height="150" rx="18" fill="#141e28" stroke="#2b3949"/>
@@ -132,8 +132,8 @@
 <rect x="1240" y="476" width="364" height="140" rx="18" fill="#141e28" stroke="#2b3949"/>
 <rect x="1240" y="496" width="3" height="100" rx="1.5" fill="#8bb7ff"/>
 <text x="1260" y="505" font-size="12" fill="#8bb7ff" font-weight="600">SERVER DISCOVERY</text>
-<text x="1260" y="535" font-size="21" font-weight="600">LibreSpeed catalog</text>
-<text x="1260" y="562" font-size="16" class="sub">Live list + bundled servers.json</text>
+<text x="1260" y="535" font-size="21" font-weight="600">Reviewed route catalog</text>
+<text x="1260" y="562" font-size="16" class="sub">Local servers.json asset only</text>
 <text x="1260" y="587" font-size="16" class="sub">Catalogs cannot expand allowlist</text>
 <rect x="1240" y="715" width="364" height="174" rx="18" fill="#141e28" stroke="#2b3949"/>
 <rect x="1240" y="735" width="3" height="134" rx="1.5" fill="#8bb7ff"/>
@@ -156,7 +156,7 @@
 <text x="72" y="1274" font-size="16" class="sub">Public IP, ASN, ISP and location are excluded from history and exports.</text>
 <rect x="850" y="1192" width="782" height="116" rx="16" fill="#151b26" stroke="#293646"/>
 <text x="874" y="1222" font-size="12" fill="#64e6d4" font-weight="600">MEASUREMENT CONTRACT</text>
-<text x="874" y="1249" font-size="16" class="sub">10 idle samples → download ≥22 s → upload ≥22 s; 1 or 4 HTTP streams.</text>
+<text x="874" y="1249" font-size="16" class="sub">10 idle samples → 5/15 s per direction; 1 or 3 HTTP streams.</text>
 <text x="874" y="1274" font-size="16" class="sub">Sustained Mbps = completed payload bits / full elapsed phase time.</text>
 <text x="48" y="1340" font-size="13" class="muted">Implementation view · arrows show principal data flows; see architecture.md for module responsibilities and trust boundaries.</text>
 <text x="1442" y="1340" font-size="13" class="muted">Developed by HigherIyer</text>

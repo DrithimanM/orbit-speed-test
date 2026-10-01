@@ -14,6 +14,34 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Artifact, syntax, fingerprint and behavioral checks
+        run: npm run check:release
+      - name: Known dependency vulnerabilities
+        run: npm audit --audit-level=high
+      - name: Shared calculation and validation coverage
+        run: node --experimental-test-coverage --test-coverage-include='**/dist/**' --test-coverage-branches=80 --test --test-concurrency=1 tests/*.test.cjs
+      - name: Verification SBOM
+        run: npm run sbom
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verification-node-${{ matrix.node }}
+          path: coverage/
+          retention-days: 14
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -21,18 +49,107 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - name: Check JavaScript
-        run: npm run check
-      - name: Security and integration checks
-        run: npm test
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx --no-install playwright install --with-deps chromium firefox webkit
+      - name: Browser engine, accessibility and offline checks
+        run: npm run test:release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: browser-evidence
+          path: coverage/browser/
+          retention-days: 14
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Redacted full-history secret scan
+        shell: bash
+        run: |
+          mkdir -p coverage
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output /tmp/gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output /tmp/gitleaks-checksums.txt https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt
+          python3 - <<'PY'
+          import hashlib,pathlib
+          expected=next(line.split()[0] for line in pathlib.Path('/tmp/gitleaks-checksums.txt').read_text().splitlines() if line.endswith('gitleaks_8.30.1_linux_x64.tar.gz'))
+          assert hashlib.sha256(pathlib.Path('/tmp/gitleaks.tgz').read_bytes()).hexdigest()==expected, 'Gitleaks checksum mismatch'
+          PY
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          /tmp/gitleaks git --no-banner --redact=100 --report-format=json --report-path=coverage/gitleaks.json
+      - name: Static security analysis
+        run: |
+          python3 -m venv /tmp/orbit-semgrep
+          /tmp/orbit-semgrep/bin/pip install --disable-pip-version-check semgrep==1.178.0
+          /tmp/orbit-semgrep/bin/semgrep scan --config p/javascript --metrics off --disable-version-check --no-git-ignore --error --json --output coverage/semgrep.json dist scripts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: security-evidence
+          path: coverage/
+          retention-days: 14
+  codeql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: github/codeql-action/init@7999b86c43a865dc79d8923397f35af22de63401 # v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@7999b86c43a865dc79d8923397f35af22de63401 # v4
+        with:
+          output: coverage/codeql
+          upload: false
+      - run: node scripts/scan-sarif.mjs coverage/codeql
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: codeql-evidence
+          path: coverage/codeql/
+          retention-days: 14
+  package:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [verify, browser, security, codeql]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Prepare release digest
+        run: tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -cf /tmp/orbit-dist.tar dist
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: /tmp/orbit-dist.tar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: attested-release
+          path: /tmp/orbit-dist.tar
+          retention-days: 14
       - name: Upload only public assets
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: dist
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: verify
+    needs: package
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

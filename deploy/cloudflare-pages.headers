@@ -1,0 +1,14 @@
+# Optional Cloudflare Pages static deployment: copy to dist/_headers in a separate hosting package.
+# GitHub Pages ignores this configuration. Never assume these headers are live.
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://speed.cloudflare.com https://stat.ripe.net https://librespeed.org https://man.speedtest.clouvider.net https://dal.speedtest.clouvider.net https://ash.speedtest.clouvider.net https://phx.speedtest.clouvider.net https://ams.speedtest.clouvider.net https://amsspeed.sharktech.net https://argalasti.skoultsos.eu https://atl.speedtest.clouvider.net https://chispeed.sharktech.net https://denspeed.sharktech.net https://fra.speedtest.clouvider.net https://la.speedtest.clouvider.net https://lasspeed.sharktech.net https://laxspeed.sharktech.net https://librespeed.a573.net https://librespeed.turris.cz https://lon.speedtest.clouvider.net https://mispeed.rackgenius.com https://nyc.speedtest.clouvider.net https://speed.fs-it.systems https://speed1.e-caps.net https://speedtest.cesnet.cz https://speedtest.kamilszczepanski.com https://speedtest1.sox.rs https://st-be-rm2.infra.garr.it https://www.librespeed.fi; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self'; manifest-src 'self'; trusted-types orbit-worker; require-trusted-types-for 'script'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-store

@@ -54,7 +54,7 @@ test('Pages workflow uses immutable action revisions and deploys only the static
   const workflow=fs.readFileSync('.github/workflows/pages.yml','utf8');
   const actions=[...workflow.matchAll(/uses:\s+([^\s]+)/g)].map(match=>match[1]);
   assert.ok(actions.length>=4);
-  for(const action of actions)assert.match(action,/^actions\/[\w-]+@[a-f0-9]{40}$/);
+  for(const action of actions)assert.match(action,/^(?:actions\/[\w-]+|github\/codeql-action\/(?:init|analyze))@[a-f0-9]{40}$/);
   assert.match(workflow,/persist-credentials: false/);assert.match(workflow,/path: dist/);assert.doesNotMatch(workflow,/pull_request_target/);
 });
 test('new measurement diagnostics stay bounded and legacy history remains valid',()=>{
@@ -62,7 +62,8 @@ test('new measurement diagnostics stay bounded and legacy history remains valid'
   assert.equal(security.validRecord(base),true);
   const transfer={bytes:10,durationMs:100,transferMs:100,mbps:.0008,points:[],loadedPings:[10],probeFailures:0,requests:1,retries:0};
   assert.equal(security.validRecord({...base,streams:4,measurementVersion:2,download:transfer}),true);
-  for(const patch of [{streams:8},{measurementVersion:3},{recoveryFrom:'x'.repeat(201)},{download:{...transfer,loadedPings:[Infinity]}},{download:{...transfer,loadedPings:Array(101).fill(1)}},{download:{...transfer,requests:1001}},{download:{...transfer,probeFailures:-1}},{download:{...transfer,ip:'192.0.2.1'}}])assert.equal(security.validRecord({...base,...patch}),false);
+  assert.equal(security.validRecord({...base,measurementVersion:3,httpTimingLatencyMs:null}),true);
+  for(const patch of [{streams:8},{measurementVersion:4},{httpTimingLatencyMs:-1},{pingMs:NaN},{recoveryFrom:'x'.repeat(201)},{download:{...transfer,loadedPings:[Infinity]}},{download:{...transfer,loadedPings:Array(101).fill(1)}},{download:{...transfer,requests:1001}},{download:{...transfer,probeFailures:-1}},{download:{...transfer,ip:'192.0.2.1'}}])assert.equal(security.validRecord({...base,...patch}),false);
 });
 
 test('network labels are bounded and radio generations require a manual source',()=>{
@@ -79,4 +80,8 @@ test('reviewed catalog additions and metadata retain exact URL boundaries',()=>{
   assert.ok(security.approvedURL('https://librespeed.org/backend-servers/servers.php',page));
   assert.throws(()=>security.approvedURL('https://librespeed.org/other',page));
   assert.throws(()=>security.approvedURL('https://chi.speedtest.clouvider.net/backend/empty.php',page));
+});
+test('legacy unavailable wire latency is preserved rather than silently dropping history',()=>{
+  const base={id:'old-flight',date:'2026-09-13T10:00:00Z',server:'Example',status:'running',pings:[],download:null,upload:null,measurementVersion:2,wireLatencyMs:null};
+  assert.equal(security.validRecord(base),true);assert.equal(security.validRecord({...base,wireLatencyMs:-1}),false);
 });

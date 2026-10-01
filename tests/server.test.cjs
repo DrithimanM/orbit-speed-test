@@ -18,7 +18,7 @@ test('local server enforces security headers and exposes only public assets',asy
   const page=await call('/');assert.equal(page.code,200);
   assert.match(page.headers['content-security-policy'],/frame-ancestors 'none'/);
   assert.equal(page.headers['x-frame-options'],'DENY');assert.equal(page.headers['x-content-type-options'],'nosniff');
-  assert.match(page.headers['permissions-policy'],/geolocation=\(self\)/);
+  assert.match(page.headers['permissions-policy'],/geolocation=\(\)/);
   assert.equal(page.headers['referrer-policy'],'no-referrer');
   for(const path of ['/../README.md','/%2e%2e/README.md','/.git/config','/scripts/serve.mjs','/tests/security.test.cjs','/package.json'])assert.equal((await call(path)).code,404,path);
   assert.equal((await call('/',{host:'attacker.example'})).code,403);

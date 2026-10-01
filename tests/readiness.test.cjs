@@ -2,9 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const context = vm.createContext({});
-vm.runInContext(fs.readFileSync("dist/core.js", "utf8"), context);
-const rate = vm.runInContext("SpeedCore.ratings", context);
+const rate=require('../dist/core.js').ratings;
 const record = (overrides = {}) => ({
   status: "complete",
   downloadMbps: 100,
