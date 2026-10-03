@@ -54,7 +54,20 @@ const browsers={chromium,firefox,webkit};
       await page.locator('#start').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('another Orbit tab'));
       await held.evaluate(()=>window.releaseLock());await held.close();
       // Force cancellation while a phase is active and confirm it survives reload.
-      await page.evaluate(()=>{profile=()=>({label:'Quick Probe',durationMs:5000});});await page.locator('#start').click();await page.waitForFunction(()=>document.body.dataset.phase==='download');await page.locator('#cancel').click();await page.waitForFunction(()=>document.querySelector('#phase').textContent==='FLIGHT CANCELLED');
+      await page.evaluate(()=>{profile=()=>({label:'Quick Probe',durationMs:30000});});await page.locator('#start').click();await page.waitForFunction(()=>document.body.dataset.phase==='download');
+      const activeId=await page.evaluate(()=>current.id);
+      // Cover/inner-screen, tablet multitasking and resizable desktop-window widths.
+      // Real device postures and native widgets are outside browser emulation.
+      for(const width of [344,690,344,768,1024,512,1440,390]){
+        await page.setViewportSize({width,height:1000});
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        assert.equal(await page.evaluate(()=>current.id),activeId);
+        assert.equal(await page.evaluate(()=>current.status),'running');
+        assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+        assert.ok(await page.locator('#cancel').isEnabled());
+        assert.ok(await page.evaluate(()=>Math.abs(document.querySelector('#speed-chart').viewBox.baseVal.width-Math.max(280,Math.min(900,document.querySelector('#speed-chart').getBoundingClientRect().width)))<2));
+      }
+      await page.locator('#cancel').click();await page.waitForFunction(()=>document.querySelector('#phase').textContent==='FLIGHT CANCELLED');
       assert.equal(await page.evaluate(()=>current.status),'cancelled');
       // The phase label changes before the final IndexedDB transaction settles.
       await page.waitForFunction(()=>controller===null);
@@ -65,8 +78,8 @@ const browsers={chromium,firefox,webkit};
       await page.waitForFunction(async()=>{const r=await navigator.serviceWorker.getRegistration();return r?.active?.state==='activated';});
       await page.reload();await page.waitForFunction(()=>navigator.serviceWorker.controller!==null);
       if(name==='webkit'){server.kill();}else{await context.route(base+'/**',route=>route.abort());}await context.addInitScript(()=>Object.defineProperty(navigator,'onLine',{get:()=>false}));await page.reload();console.log(`${name}: offline document loaded`);try{await page.waitForFunction(()=>document.querySelector('#history-count').textContent==='2');}catch(error){console.error(await page.evaluate(()=>({history:document.querySelector('#history-count')?.textContent,storage:document.querySelector('#storage-status')?.textContent,online:navigator.onLine,worker:!!navigator.serviceWorker.controller})));throw error;}await page.waitForFunction(()=>navigator.onLine===false && document.querySelector('#start').disabled);await page.locator('#tab-history').click();assert.equal(await page.locator('#history tr').count(),2);
-      assert.deepEqual(await page.evaluate(()=>window.orbitUnhandled),[]);const expectedNetworkDiagnostics=name==='webkit'?errors.filter(message=>message.includes('due to access control checks.')):[];assert.deepEqual(errors.filter(message=>!expectedNetworkDiagnostics.includes(message)),[]);await fs.writeFile(path.join(out,`${name}-result.json`),JSON.stringify({browser:name,syntheticMeasurement:'passed',idleSamples:record.pings.length,accessibilityAA:'no automated violations',offline:'passed',cancellation:'passed',crossTabLock:'passed',expectedNetworkDiagnostics,errors:errors.filter(message=>!expectedNetworkDiagnostics.includes(message))},null,2));
-      console.log(`PASS ${name}: production engine, persistence, route filters, cancellation, tab locking, offline shell, 320–1440px layouts and automated WCAG AA checks`);
+      assert.deepEqual(await page.evaluate(()=>window.orbitUnhandled),[]);const expectedNetworkDiagnostics=name==='webkit'?errors.filter(message=>message.includes('due to access control checks.')):[];assert.deepEqual(errors.filter(message=>!expectedNetworkDiagnostics.includes(message)),[]);await fs.writeFile(path.join(out,`${name}-result.json`),JSON.stringify({browser:name,syntheticMeasurement:'passed',idleSamples:record.pings.length,accessibilityAA:'no automated violations',offline:'passed',cancellation:'passed',crossTabLock:'passed',activeResize:'same flight survived eight viewport changes; chart dimensions refreshed',expectedNetworkDiagnostics,errors:errors.filter(message=>!expectedNetworkDiagnostics.includes(message))},null,2));
+      console.log(`PASS ${name}: production engine, persistence, route filters, cancellation, active resizing, tab locking, offline shell, 320–1440px layouts and automated WCAG AA checks`);
       await context.close();await browser.close();browser=null;
     }
   }finally{if(browser)await browser.close();server.kill();}
