@@ -723,10 +723,41 @@ const OrbitUI = (() => {
       },
       true,
     );
-    window.addEventListener("resize", () => {
+    // Refresh measured graphics when the window, visible viewport or chart
+    // container changes. Keep browser zoom and the active flight untouched.
+    let layoutFrame = null;
+    const refreshLayout = () => {
       closeInfo(false);
-      drawThroughput(graphRecord);
+      if (layoutFrame !== null) return;
+      layoutFrame = requestAnimationFrame(() => {
+        layoutFrame = null;
+        drawThroughput(graphRecord);
+      });
+    };
+    window.addEventListener("resize", refreshLayout);
+    window.addEventListener("pageshow", refreshLayout);
+    window.visualViewport?.addEventListener("resize", refreshLayout);
+    window.screen?.orientation?.addEventListener?.("change", refreshLayout);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") refreshLayout();
     });
+    if (typeof ResizeObserver !== "undefined") {
+      const widths = new WeakMap();
+      const charts = new ResizeObserver((entries) => {
+        let changed = false;
+        for (const entry of entries) {
+          const width = entry.contentRect.width;
+          if (widths.get(entry.target) !== width) {
+            widths.set(entry.target, width);
+            changed = true;
+          }
+        }
+        // Only inline-size changes count; drawing can change the chart height.
+        if (changed) refreshLayout();
+      });
+      for (const id of ["speed-chart", "telemetry-chart"])
+        charts.observe($(id));
+    }
     document.addEventListener("scroll", () => closeInfo(false), true);
     $("open-telemetry").addEventListener("click", () =>
       selectView("telemetry", true),
